@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced Combat Arena - Battle!</title>
+    <link rel="stylesheet" href="../styles/game.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="arena-floor"></div>
+        
+        <!-- Health and Ultimate Bars -->
+        <div class="status-bars">
+            <div class="player1-status">
+                <div id="health1" class="health-bar">
+                    <div id="health1-fill" class="health-fill"></div>
+                </div>
+                <div id="ultimate1" class="ultimate-meter">
+                    <div id="ultimate1-fill" class="ultimate-fill"></div>
+                </div>
+            </div>
+            
+            <div class="player2-status">
+                <div id="health2" class="health-bar">
+                    <div id="health2-fill" class="health-fill"></div>
+                </div>
+                <div id="ultimate2" class="ultimate-meter">
+                    <div id="ultimate2-fill" class="ultimate-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Players -->
+        <div id="player1" class="player"></div>
+        <div id="player2" class="player"></div>
+
+        <!-- Cooldown Displays -->
+        <div id="cooldown1" class="cooldown-display"></div>
+        <div id="cooldown2" class="cooldown-display"></div>
+
+        <!-- Controls Info -->
+        <div class="controls-info">
+            <div class="player1-controls">
+                Player 1: A/D - Move, Z - Light Attack, X - Heavy Attack, C - Ultimate, V - Dodge
+            </div>
+            <div class="player2-controls">
+                Player 2: ←/→ - Move, O - Light Attack, P - Heavy Attack, I - Ultimate, U - Dodge
+            </div>
+        </div>
+    </div>
+
+    <script src="../scripts/characters.js"></script>
+    <script src="../scripts/game.js"></script>
+</body>
+</html> 

@@ -1,0 +1,312 @@
+.game-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: linear-gradient(to bottom, #2c3e50, #34495e);
+    overflow: hidden;
+}
+
+.arena-floor {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(to bottom, #95a5a6, #7f8c8d);
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+}
+
+.player {
+    position: absolute;
+    bottom: 100px;
+    width: 60px;
+    height: 100px;
+    z-index: 10;
+}
+
+.player::before {  /* Face details */
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+}
+
+.player::after {  /* Eyes */
+    content: '• •';
+    position: absolute;
+    top: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #333;
+    font-size: 14px;
+    letter-spacing: 8px;
+}
+
+/* Warrior specific styles */
+.player[data-character="warrior"] {
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.player[data-character="warrior"]::before {
+    border-radius: 5px;
+    height: 25px;
+}
+
+/* Ninja specific styles */
+.player[data-character="ninja"] {
+    clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 100%, 0 100%, 0 20%);
+}
+
+.player[data-character="ninja"]::before {
+    width: 35px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Mage specific styles */
+.player[data-character="mage"] {
+    clip-path: polygon(50% 0%, 85% 15%, 100% 100%, 0 100%, 15% 15%);
+}
+
+.player[data-character="mage"]::before {
+    width: 30px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+/* Add weapon effects */
+.player[data-character="warrior"]::after {
+    content: '• •\A▬';
+    white-space: pre;
+    font-size: 20px;
+}
+
+.player[data-character="ninja"]::after {
+    content: '• •\A†';
+    white-space: pre;
+}
+
+.player[data-character="mage"]::after {
+    content: '• •\A⚡';
+    white-space: pre;
+}
+
+#player1 {
+    left: 100px;
+}
+
+#player2 {
+    left: calc(100% - 160px); /* Changed from 'right' to 'left' with calc */
+}
+
+.status-bars {
+    position: absolute;
+    top: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 50px;
+    box-sizing: border-box;
+}
+
+.health-bar, .ultimate-meter {
+    width: 300px;
+    height: 20px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 5px 0;
+}
+
+.health-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #e74c3c, #c0392b);
+    transition: width 0.3s;
+}
+
+.ultimate-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(to right, #f1c40f, #f39c12);
+    transition: width 0.3s;
+}
+
+.cooldown-display {
+    position: absolute;
+    color: white;
+    font-size: 14px;
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+#cooldown1 {
+    left: 100px;
+    top: 150px;
+}
+
+#cooldown2 {
+    right: 100px;
+    top: 150px;
+}
+
+.controls-info {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-sizing: border-box;
+    color: white;
+    font-size: 14px;
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+/* Attack Animations */
+.light-attack {
+    animation: lightAttack 0.3s ease-in-out;
+}
+
+.heavy-attack {
+    animation: heavyAttack 0.5s ease-in-out;
+}
+
+@keyframes lightAttack {
+    0% { transform: translateX(0) scaleX(var(--facing)); }
+    25% { transform: translateX(calc(var(--facing) * -10px)) scaleX(var(--facing)); }
+    50% { transform: translateX(calc(var(--facing) * 20px)) scaleX(var(--facing)); }
+    100% { transform: translateX(0) scaleX(var(--facing)); }
+}
+
+@keyframes heavyAttack {
+    0% { transform: translateX(0) scaleX(var(--facing)) rotate(0deg); }
+    25% { transform: translateX(calc(var(--facing) * -20px)) scaleX(var(--facing)) rotate(-45deg); }
+    50% { transform: translateX(calc(var(--facing) * 40px)) scaleX(var(--facing)) rotate(90deg); }
+    100% { transform: translateX(0) scaleX(var(--facing)) rotate(0deg); }
+}
+
+/* Hit Effects */
+.hit-effect {
+    position: absolute;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.hit-effect.light {
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle, #fff 0%, transparent 70%);
+    animation: lightHit 0.3s ease-out forwards;
+}
+
+.hit-effect.heavy {
+    width: 50px;
+    height: 50px;
+    background: radial-gradient(circle, #ff0 0%, #f00 50%, transparent 70%);
+    animation: heavyHit 0.5s ease-out forwards;
+}
+
+@keyframes lightHit {
+    0% { transform: scale(0); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes heavyHit {
+    0% { transform: scale(0) rotate(0deg); opacity: 1; }
+    100% { transform: scale(3) rotate(180deg); opacity: 0; }
+}
+
+/* Character-specific attack effects */
+.player[data-character="warrior"].light-attack::after {
+    content: '⚔️';
+}
+
+.player[data-character="ninja"].light-attack::after {
+    content: '🌟';
+}
+
+.player[data-character="mage"].light-attack::after {
+    content: '✨';
+}
+
+.player[data-character="warrior"].heavy-attack::after {
+    content: '💥';
+}
+
+.player[data-character="ninja"].heavy-attack::after {
+    content: '⚡';
+}
+
+.player[data-character="mage"].heavy-attack::after {
+    content: '🔮';
+}
+
+/* Add these new styles for attack effects */
+.attack-effect {
+    position: absolute;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.attack-effect.light {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(45deg, transparent, #fff);
+    animation: slashEffect 0.3s ease-out forwards;
+}
+
+.attack-effect.heavy {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(45deg, transparent, #ff0, #f00);
+    animation: slashEffect 0.5s ease-out forwards;
+}
+
+@keyframes slashEffect {
+    0% {
+        opacity: 1;
+        transform: scale(0) rotate(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.5) rotate(180deg);
+    }
+}
+
+/* Character-specific attack effects */
+.player[data-character="warrior"] .attack-effect.light::before {
+    content: '⚔️';
+    font-size: 24px;
+}
+
+.player[data-character="ninja"] .attack-effect.light::before {
+    content: '🌟';
+    font-size: 24px;
+}
+
+.player[data-character="mage"] .attack-effect.light::before {
+    content: '✨';
+    font-size: 24px;
+}
+
+.player[data-character="warrior"] .attack-effect.heavy::before {
+    content: '💥';
+    font-size: 32px;
+}
+
+.player[data-character="ninja"] .attack-effect.heavy::before {
+    content: '⚡';
+    font-size: 32px;
+}
+
+.player[data-character="mage"] .attack-effect.heavy::before {
+    content: '🔮';
+    font-size: 32px;
+} 

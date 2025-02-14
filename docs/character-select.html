@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Character Selection - Enhanced Combat Arena</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <link rel="stylesheet" href="../styles/character-select.css">
+</head>
+<body>
+    <div class="character-select">
+        <h1>Choose Your Fighter</h1>
+        <div class="player-turn">Player 1's Turn</div>
+        
+        <div class="character-grid">
+            <div class="character-card" data-character="warrior">
+                <div class="character-preview" style="background: linear-gradient(135deg, #e74c3c, #c0392b)"></div>
+                <div class="character-info">
+                    <div class="character-name">Warrior</div>
+                    <div class="character-stats">
+                        Health: ★★★<br>
+                        Speed: ★★☆<br>
+                        Power: ★★★
+                    </div>
+                </div>
+            </div>
+
+            <div class="character-card" data-character="ninja">
+                <div class="character-preview" style="background: linear-gradient(135deg, #3498db, #2980b9)"></div>
+                <div class="character-info">
+                    <div class="character-name">Ninja</div>
+                    <div class="character-stats">
+                        Health: ★★☆<br>
+                        Speed: ★★★<br>
+                        Power: ★★☆
+                    </div>
+                </div>
+            </div>
+
+            <div class="character-card" data-character="mage">
+                <div class="character-preview" style="background: linear-gradient(135deg, #9b59b6, #8e44ad)"></div>
+                <div class="character-info">
+                    <div class="character-name">Mage</div>
+                    <div class="character-stats">
+                        Health: ★☆☆<br>
+                        Speed: ★★☆<br>
+                        Power: ★★★
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="selection-info">
+            <div class="player1-selection">Player 1: Not Selected</div>
+            <div class="player2-selection">Player 2: Not Selected</div>
+        </div>
+
+        <button class="start-button" id="startButton" disabled>START BATTLE!</button>
+    </div>
+
+    <script>
+        let player1Selection = null;
+        let player2Selection = null;
+        const playerTurn = document.querySelector('.player-turn');
+        const startButton = document.getElementById('startButton');
+        const p1SelectionText = document.querySelector('.player1-selection');
+        const p2SelectionText = document.querySelector('.player2-selection');
+
+        document.querySelectorAll('.character-card').forEach(card => {
+            card.addEventListener('click', () => {
+                if (!player1Selection) {
+                    player1Selection = card.dataset.character;
+                    card.classList.add('selected');
+                    playerTurn.textContent = "Player 2's Turn";
+                    p1SelectionText.textContent = `Player 1: ${card.querySelector('.character-name').textContent}`;
+                } else if (!player2Selection && card.dataset.character !== player1Selection) {
+                    player2Selection = card.dataset.character;
+                    card.classList.add('selected');
+                    playerTurn.textContent = "Ready to Battle!";
+                    p2SelectionText.textContent = `Player 2: ${card.querySelector('.character-name').textContent}`;
+                    startButton.disabled = false;
+                }
+            });
+        });
+
+        startButton.addEventListener('click', () => {
+            // Store selections for the game page
+            localStorage.setItem('player1Character', player1Selection);
+            localStorage.setItem('player2Character', player2Selection);
+            window.location.href = 'game.html';
+        });
+    </script>
+</body>
+</html> 
