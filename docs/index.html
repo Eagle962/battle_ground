@@ -1,1 +1,587 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced Combat Arena</title>
+    <style>
+        body {
+            background: linear-gradient(to bottom, #1a2a3d, #2c3e50);
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        .arena-floor {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(to bottom, #34495e, #2c3e50);
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+        }
+        .player {
+            width: 60px;
+            height: 120px;
+            position: absolute;
+            bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .player::before {  /* Head */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 15px;
+            width: 30px;
+            height: 30px;
+            background: inherit;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        .player::after {  /* Body */
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 10px;
+            width: 40px;
+            height: 60px;
+            background: inherit;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        #player1 {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            left: 100px;
+        }
+        #player2 {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            right: 100px;
+        }
+        .transformed {
+            filter: brightness(1.5) contrast(1.2);
+            transform: scale(1.2);
+        }
+        .transformed::before,
+        .transformed::after {
+            box-shadow: 0 0 20px rgba(255,165,0,0.8);
+        }
+        .player.moving {
+            animation: bounce 0.5s infinite;
+        }
+        .player.sliding {
+            animation: slide 0.5s forwards;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        @keyframes slide {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg) translateX(30px); height: 60px; }
+            100% { transform: rotate(0deg); }
+        }
+        .health-bar {
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            position: absolute;
+            top: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            transition: width 0.3s;
+            border-radius: 10px;
+        }
+        #health1 { left: 20px; }
+        #health2 { right: 20px; }
+        
+        .light-attack {
+            position: absolute;
+            width: 50px;
+            height: 8px;
+            background: linear-gradient(90deg, rgba(255,255,0,0.8), transparent);
+            display: none;
+            filter: blur(2px);
+            animation: lightSlash 0.3s ease-out;
+            border-radius: 4px;
+        }
+        .heavy-attack {
+            position: absolute;
+            width: 60px;
+            height: 20px;
+            background: linear-gradient(90deg, rgba(255,107,0,0.9), transparent);
+            display: none;
+            filter: blur(3px);
+            animation: heavySlash 0.5s ease-out;
+            border-radius: 6px;
+        }
+        .ultimate-meter {
+            position: absolute;
+            width: 150px;
+            height: 15px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 7px;
+            overflow: hidden;
+            top: 45px;
+        }
+        .ultimate-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+            transition: width 0.3s;
+        }
+        #ultimate1 { left: 20px; }
+        #ultimate2 { right: 20px; }
 
+        .ultimate-ready {
+            animation: pulse 1.5s infinite;
+        }
+
+        .ultimate-attack-p1 {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #ff0000, transparent);
+            filter: blur(5px);
+            animation: transformationAura 2s ease-out infinite;
+            display: none;
+        }
+
+        .ultimate-attack-p2 {
+            position: absolute;
+            width: 0;
+            height: 300px;
+            background: linear-gradient(to right, #0066ff, transparent);
+            filter: blur(3px);
+            animation: ultimateBeam 1.2s ease-out forwards;
+            display: none;
+        }
+
+        @keyframes transformationAura {
+            0% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.2); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 0.7; }
+        }
+
+        @keyframes ultimateBeam {
+            0% { width: 0; opacity: 0; }
+            10% { width: 100px; opacity: 0.3; }
+            50% { width: 800px; opacity: 1; }
+            100% { width: 1000px; opacity: 0; }
+        }
+
+        /* Rest of your existing animations... */
+        
+        .dodge-effect {
+            position: absolute;
+            width: 60px;
+            height: 20px;
+            background: rgba(255,255,255,0.3);
+            filter: blur(5px);
+            animation: dodgeTrail 0.5s ease-out;
+        }
+
+        @keyframes dodgeTrail {
+            0% { opacity: 0.5; transform: scaleX(1); }
+            100% { opacity: 0; transform: scaleX(2); }
+        }
+
+        /* Continue with your existing styles... */
+    </style>
+</head>
+<body>
+    <div class="arena-floor"></div>
+    <div id="player1" class="player"></div>
+    <div id="player2" class="player"></div>
+    
+    <div id="health1" class="health-bar">
+        <div id="health1-fill" class="health-fill" style="width: 100%"></div>
+    </div>
+    <div id="health2" class="health-bar">
+        <div id="health2-fill" class="health-fill" style="width: 100%"></div>
+    </div>
+
+    <div id="ultimate1" class="ultimate-meter">
+        <div id="ultimate1-fill" class="ultimate-fill"></div>
+    </div>
+    <div id="ultimate2" class="ultimate-meter">
+        <div id="ultimate2-fill" class="ultimate-fill"></div>
+    </div>
+
+    <div id="cooldown1" class="cooldown-display"></div>
+    <div id="cooldown2" class="cooldown-display"></div>
+</body>
+<script>
+    document.addEventListener('keydown', (e) => {
+        keys[e.key.toLowerCase()] = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+        keys[e.key.toLowerCase()] = false;
+    });
+    const player1 = {
+        element: document.getElementById('player1'),
+        health: 200,
+        maxHealth: 200,
+        x: 100,
+        facing: 1,
+        lightCooldown: 0,
+        heavyCooldown: 0,
+        ultimate: 0,
+        transformed: false,
+        dodgeCooldown: 0,
+        stunned: false,  // 新增這行
+        speed: 5
+    };
+    
+    const player2 = {
+        element: document.getElementById('player2'),
+        health: 200,
+        maxHealth: 200,
+        x: window.innerWidth - 150,
+        facing: -1,
+        lightCooldown: 0,
+        heavyCooldown: 0,
+        ultimate: 0,
+        dodgeCooldown: 0,
+        stunned: false,  // 新增這行
+        speed: 5
+    };
+
+    const LIGHT_COOLDOWN = 500;
+    const HEAVY_COOLDOWN = 2000;
+    const ULTIMATE_REQUIRED = 30;
+    const DODGE_COOLDOWN = 1000;
+    const keys = {};
+
+    function dodge(player) {
+        if (player.dodgeCooldown > 0) return;
+
+        player.element.classList.add('sliding');
+        player.dodgeCooldown = DODGE_COOLDOWN;
+
+        // Create dodge trail effect
+        const trail = document.createElement('div');
+        trail.className = 'dodge-effect';
+        trail.style.left = player.x + 'px';
+        trail.style.bottom = '20px';
+        document.body.appendChild(trail);
+
+        // Move player during dodge
+        const dodgeDistance = player.facing * 150;
+        const newX = Math.max(0, Math.min(window.innerWidth - 60, player.x + dodgeDistance));
+        player.x = newX;
+        player.element.style.left = player.x + 'px';
+
+        setTimeout(() => {
+            player.element.classList.remove('sliding');
+            trail.remove();
+        }, 500);
+    }
+    function updateCooldowns() {
+        document.getElementById('cooldown1').textContent = 
+            `Light: ${(player1.lightCooldown/1000).toFixed(1)}s
+             Heavy: ${(player1.heavyCooldown/1000).toFixed(1)}s
+             Dodge: ${(player1.dodgeCooldown/1000).toFixed(1)}s
+             ${player1.transformed ? 'TRANSFORMED!' : ''}`;
+        document.getElementById('cooldown2').textContent = 
+            `Light: ${(player2.lightCooldown/1000).toFixed(1)}s
+             Heavy: ${(player2.heavyCooldown/1000).toFixed(1)}s
+             Dodge: ${(player2.dodgeCooldown/1000).toFixed(1)}s`;
+    }
+
+
+    function transform(player) {
+        if (player.ultimate < ULTIMATE_REQUIRED) return;
+        
+        player.transformed = true;
+        player.stunned = false;  // 加在這裡，變身時解除暈眩
+        player.element.style.filter = '';  // 清除暈眩的視覺效果
+        player.element.classList.add('transformed');
+        player.maxHealth = 300;
+        player.health = Math.min(player.health + 100, player.maxHealth);
+        player.speed = 8;
+
+        // Create transformation effect
+        const aura = document.createElement('div');
+        aura.className = 'ultimate-attack-p1';
+        aura.style.left = (player.x - 70) + 'px';
+        aura.style.bottom = '0px';
+        document.body.appendChild(aura);
+        aura.style.display = 'block';
+
+        // Update health bar
+        const healthBar = document.getElementById('health1-fill');
+        healthBar.style.width = (player.health / player.maxHealth * 100) + '%';
+
+        // Reset ultimate meter
+        player.ultimate = 0;
+        document.getElementById('ultimate1-fill').style.width = '0%';
+        document.getElementById('ultimate1').classList.remove('ultimate-ready');
+
+        // End transformation after 10 seconds
+        setTimeout(() => {
+            player.transformed = false;
+            player.element.classList.remove('transformed');
+            player.maxHealth = 200;
+            player.health = Math.min(player.health, player.maxHealth);
+            player.speed = 5;
+            healthBar.style.width = (player.health / player.maxHealth * 100) + '%';
+            aura.remove();
+        }, 10000);
+    }
+
+    function ultimateBeam(attacker, defender) {
+    if (attacker.ultimate < ULTIMATE_REQUIRED) return;
+
+    const beam = document.createElement('div');
+    beam.className = 'ultimate-attack-p2';
+    beam.style.left = (attacker.facing > 0 ? attacker.x + 60 : attacker.x - 940) + 'px';
+    beam.style.bottom = '0px';
+    document.body.appendChild(beam);
+    beam.style.display = 'block';
+
+    const inLine = (attacker.facing > 0 && defender.x > attacker.x) ||
+                 (attacker.facing < 0 && defender.x < attacker.x);
+    const distance = Math.abs((attacker.x + 30) - (defender.x + 30));
+    
+    if (inLine && distance < 800) {
+        // 改為定身效果而不是傷害
+        defender.stunned = true;
+        defender.element.style.filter = 'brightness(0.5) sepia(1)';
+        
+        // 3秒後解除定身
+        setTimeout(() => {
+            defender.stunned = false;
+            defender.element.style.filter = '';
+        }, 5000);
+    }
+
+    attacker.ultimate = 0;
+    document.getElementById('ultimate2-fill').style.width = '0%';
+    document.getElementById('ultimate2').classList.remove('ultimate-ready');
+
+    setTimeout(() => beam.remove(), 1200);
+}
+
+    // [Previous helper functions remain the same: createParticles, attack, etc.]
+
+    let lastTime = performance.now();
+    function gameLoop(currentTime) {
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        // Update cooldowns
+        player1.lightCooldown = Math.max(0, player1.lightCooldown - deltaTime);
+        player1.heavyCooldown = Math.max(0, player1.heavyCooldown - deltaTime);
+        player1.dodgeCooldown = Math.max(0, player1.dodgeCooldown - deltaTime);
+        player2.lightCooldown = Math.max(0, player2.lightCooldown - deltaTime);
+        player2.heavyCooldown = Math.max(0, player2.heavyCooldown - deltaTime);
+        player2.dodgeCooldown = Math.max(0, player2.dodgeCooldown - deltaTime);
+        
+        updateCooldowns();
+
+        let player1Moving = false;
+        let player2Moving = false;
+
+        // Player 1 controls
+        if (keys['a'] && player1.x > 0 && !player1.stunned) {
+        player1.x -= player1.speed;
+        player1.facing = -1;
+        player1Moving = true;
+        player1.element.style.left = player1.x + 'px';
+    }
+        if (keys['d'] && player1.x < window.innerWidth - 60 && !player1.stunned) {
+            player1.x += player1.speed;
+            player1.facing = 1;
+            player1Moving = true;
+            player1.element.style.left = player1.x + 'px';
+        }
+        if (keys['z'] && !player1.stunned) {
+            const damage = player1.transformed ? 8 : 5;
+            attack(player1, player2, damage, false);
+        }
+        if (keys['x'] && !player1.stunned) {
+            const damage = player1.transformed ? 15 : 10;
+            attack(player1, player2, damage, true);
+        }
+        if (keys['c'] && player1.ultimate >= ULTIMATE_REQUIRED ) {
+            transform(player1);
+        }
+        if (keys['v'] && !player1.stunned) {
+            dodge(player1);
+        }
+
+        // Player 2 controls
+        if (keys['arrowleft'] && player2.x > 0) {
+            player2.x -= player2.speed;
+            player2.facing = -1;
+            player2Moving = true;
+            player2.element.style.left = player2.x + 'px';
+        }
+        if (keys['arrowright'] && player2.x < window.innerWidth - 60) {
+            player2.x += player2.speed;
+            player2.facing = 1;
+            player2Moving = true;
+            player2.element.style.left = player2.x + 'px';
+        }
+        if (keys['o']) {
+            attack(player2, player1, 5, false);
+        }
+        if (keys['p']) {
+            attack(player2, player1, 10, true);
+        }
+        if (keys['i'] && player2.ultimate >= ULTIMATE_REQUIRED) {
+            ultimateBeam(player2, player1);
+        }
+        if (keys['u']) {
+            dodge(player2);
+        }
+
+        // Update positions and animations
+               
+
+        
+        player1.element.classList.toggle('moving', player1Moving);
+        player2.element.classList.toggle('moving', player2Moving);
+
+        // Check for game over
+        if (player1.health <= 0 || player2.health <= 0) {
+            const winner = player1.health <= 0 ? "Player 2" : "Player 1";
+            alert(winner + " wins!");
+            return;
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop(performance.now());
+</script>
+<script>
+    function createParticles(x, y, isHeavy) {
+        const container = document.createElement('div');
+        container.className = 'attack-particles';
+        container.style.left = x + 'px';
+        container.style.bottom = y + 'px';
+        
+        const particleCount = isHeavy ? 15 : 8;
+        
+        for(let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            
+            const angle = (Math.random() * Math.PI * 2);
+            const speed = isHeavy ? Math.random() * 100 + 50 : Math.random() * 50 + 25;
+            const x = Math.cos(angle) * speed;
+            const y = Math.sin(angle) * speed;
+            
+            particle.style.setProperty('--x', `${x}px`);
+            particle.style.setProperty('--y', `${y}px`);
+            particle.style.background = isHeavy ? '#ff6b00' : '#ffff00';
+            
+            container.appendChild(particle);
+        }
+        
+        document.body.appendChild(container);
+        setTimeout(() => container.remove(), 500);
+    }
+
+    function attack(attacker, defender, damage, isHeavy) {
+        if (isHeavy && attacker.heavyCooldown > 0) return;
+        if (!isHeavy && attacker.lightCooldown > 0) return;
+
+        const attack = document.createElement('div');
+        attack.className = isHeavy ? 'heavy-attack' : 'light-attack';
+        
+        const attackX = attacker.facing > 0 ? 
+            attacker.x + 60 : attacker.x - (isHeavy ? 60 : 50);
+        attack.style.left = attackX + 'px';
+        attack.style.bottom = '70px';
+        
+        if (attacker.facing < 0) {
+            attack.style.transform = 'scaleX(-1)';
+        }
+        
+        document.body.appendChild(attack);
+        attack.style.display = 'block';
+
+        createParticles(attackX + (attacker.facing > 0 ? 30 : -30), 70, isHeavy);
+
+        if (isHeavy) {
+            attacker.heavyCooldown = HEAVY_COOLDOWN;
+        } else {
+            attacker.lightCooldown = LIGHT_COOLDOWN;
+        }
+
+        const attackerCenter = attacker.x + 30;
+        const defenderCenter = defender.x + 30;
+        const distance = Math.abs(attackerCenter - defenderCenter);
+        
+        if (distance < 120) {
+            defender.health = Math.max(0, defender.health - damage);
+            
+            // 修改大招累積邏輯：玩家1在變身狀態下不能累積大招
+            if (attacker === player1) {
+                if (!attacker.transformed) {
+                    attacker.ultimate = Math.min(ULTIMATE_REQUIRED, attacker.ultimate + damage);
+                }
+            } else {
+                attacker.ultimate = Math.min(ULTIMATE_REQUIRED, attacker.ultimate + damage);
+            }
+            
+            const healthBar = defender === player1 ? 
+                document.getElementById('health1-fill') : 
+                document.getElementById('health2-fill');
+            healthBar.style.width = (defender.health / defender.maxHealth * 100) + '%';
+            
+            const ultimateMeter = attacker === player1 ? 
+                document.getElementById('ultimate1-fill') : 
+                document.getElementById('ultimate2-fill');
+            ultimateMeter.style.width = (attacker.ultimate / ULTIMATE_REQUIRED * 100) + '%';
+            
+            if (attacker.ultimate >= ULTIMATE_REQUIRED) {
+                ultimateMeter.parentElement.classList.add('ultimate-ready');
+            }
+            
+            defender.element.style.transform = `translateX(${attacker.facing * 10}px)`;
+            setTimeout(() => {
+                defender.element.style.transform = 'translateX(0)';
+            }, 100);
+        }
+
+        setTimeout(() => attack.remove(), isHeavy ? 500 : 300);
+    }
+
+
+    // Add particle style if not already present
+    const style = document.createElement('style');
+    style.textContent = `
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            animation: particle 0.5s ease-out forwards;
+        }
+        @keyframes particle {
+            0% { 
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% { 
+                transform: translate(var(--x), var(--y)) scale(0);
+                opacity: 0;
+            }
+        }
+        .attack-particles {
+            position: absolute;
+            pointer-events: none;
+        }
+    `;
+    document.head.appendChild(style);
+</script>
+</html>
