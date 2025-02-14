@@ -2,9 +2,8 @@
 <html>
 <head>
     <title>Character Selection - Enhanced Combat Arena</title>
-    <base href="/battle_ground/">
-    <link rel="stylesheet" href="styles/main.css">
-    <link rel="stylesheet" href="styles/character-select.css">
+    <link rel="stylesheet" href="/battle_ground/styles/main.css">
+    <link rel="stylesheet" href="/battle_ground/styles/character-select.css">
 </head>
 <body>
     <div class="character-select">
@@ -86,7 +85,7 @@
             // Store selections for the game page
             localStorage.setItem('player1Character', player1Selection);
             localStorage.setItem('player2Character', player2Selection);
-            window.location.href = 'game.html';
+            window.location.href = '/battle_ground/game.html';
         });
     </script>
 </body>
