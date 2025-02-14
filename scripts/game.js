@@ -8,7 +8,7 @@ const JUMP_FORCE = 12;
 const MOVE_SPEED = 5;
 const LIGHT_COOLDOWN = 500;
 const HEAVY_COOLDOWN = 1000;
-const DODGE_COOLDOWN = 1500;
+const DODGE_COOLDOWN = 3000;
 const ULTIMATE_REQUIRED = 100;
 const ATTACK_RANGE = 80;
 const KNOCKBACK_FORCE = 8;
@@ -26,7 +26,12 @@ const player1 = {
     lightCooldown: 0,
     heavyCooldown: 0,
     dodgeCooldown: 0,
-    facing: 1
+    facing: -1,
+    isStunned: false,
+    stunDuration: 0,
+    isDodging: false,
+    invincible: false,
+    dodgeStart: 0
 };
 
 const player2 = {
@@ -41,7 +46,12 @@ const player2 = {
     lightCooldown: 0,
     heavyCooldown: 0,
     dodgeCooldown: 0,
-    facing: -1
+    facing: 1,
+    isStunned: false,
+    stunDuration: 0,
+    isDodging: false,
+    invincible: false,
+    dodgeStart: 0
 };
 
 // Key states
@@ -53,8 +63,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') keys['arrowleft'] = true;
     else if (e.key === 'ArrowRight') keys['arrowright'] = true;
     else keys[e.key.toLowerCase()] = true;
-    
-    console.log('Keys state:', keys); // Debug log
 });
 
 document.addEventListener('keyup', (e) => {
@@ -63,15 +71,83 @@ document.addEventListener('keyup', (e) => {
     else keys[e.key.toLowerCase()] = false;
 });
 
+function performDodge(player) {
+    if (player.dodgeCooldown > 0 || player.isStunned || player.isDodging) return;
+
+    player.isDodging = true;
+    player.invincible = true;
+    player.dodgeStart = Date.now();
+    player.dodgeCooldown = DODGE_COOLDOWN;
+    
+    // Add dodge animation class
+    player.element.classList.add('dodging');
+    
+    // Move player in facing direction
+    player.velX = -player.facing * 3; // Dodge speed
+    
+    // Remove dodge state after animation
+    setTimeout(() => {
+        player.isDodging = false;
+        player.invincible = false;
+        player.element.classList.remove('dodging');
+        player.velX = 0;
+    }, 400); // Match this with the CSS animation duration
+}
+
 function updatePlayer(player, opponent, moveKeys, attackKeys) {
-    // Movement
+    // Update stun duration
+    if (player.stunDuration > 0) {
+        player.stunDuration -= 16; // Decrease stun duration (16ms is roughly one frame)
+        if (player.stunDuration <= 0) {
+            player.isStunned = false;
+            player.element.classList.remove('stunned');
+        }
+    }
+
+    // If stunned or dodging, only apply current movement and gravity
+    if (player.isStunned || player.isDodging) {
+        // Apply gravity
+        player.velY += GRAVITY;
+        player.y += player.velY;
+        
+        // Apply current movement
+        player.x += player.velX;
+        
+        // Add friction for stun knockback
+        if (player.isStunned) {
+            player.velX *= 0.9;
+        }
+        
+        // Floor collision
+        if (player.y > 0) {
+            player.y = 0;
+            player.velY = 0;
+        }
+        
+        // Wall collisions
+        if (player.x < 0) {
+            player.x = 0;
+            player.velX = 0;
+        }
+        if (player.x > window.innerWidth - 60) {
+            player.x = window.innerWidth - 60;
+            player.velX = 0;
+        }
+        
+        // Update position
+        player.element.style.left = `${player.x}px`;
+        player.element.style.bottom = `${100 - player.y}px`;
+        return;
+    }
+
+    // Regular movement only if not stunned and not dodging
     if (keys[moveKeys.left]) {
         player.velX = -MOVE_SPEED;
-        player.facing = -1;
+        player.facing = 1;
         player.element.style.setProperty('--facing', player.facing);
     } else if (keys[moveKeys.right]) {
         player.velX = MOVE_SPEED;
-        player.facing = 1;
+        player.facing = -1;
         player.element.style.setProperty('--facing', player.facing);
     } else {
         player.velX = 0;
@@ -97,29 +173,24 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
     if (player.heavyCooldown > 0) player.heavyCooldown -= 16;
     if (player.dodgeCooldown > 0) player.dodgeCooldown -= 16;
 
-    // Update position and facing direction separately
+    // Update position and facing direction
     player.element.style.left = `${player.x}px`;
-    player.element.style.bottom = `${100 - player.y}px`; // Adjust for bottom positioning
+    player.element.style.bottom = `${100 - player.y}px`;
     player.element.style.transform = `scaleX(${player.facing})`;
-    
-    // Debug logging
-    console.log(`Player 2 position: x=${player2.x}, y=${player2.y}, facing=${player2.facing}`);
-    console.log(`Player 2 element:`, player2.element.style.cssText);
 }
 
 function performAttack(attacker, defender, damage, isHeavy) {
-    // Check cooldowns
+    // Check cooldowns and stun status
     if (isHeavy && attacker.heavyCooldown > 0) return;
     if (!isHeavy && attacker.lightCooldown > 0) return;
-
-    console.log(`${isHeavy ? 'Heavy' : 'Light'} attack performed!`);
+    if (attacker.isStunned || attacker.isDodging) return;
 
     // Always play attack animation
     if (isHeavy) {
-        attacker.heavyCooldown = 1000; // 1 second
+        attacker.heavyCooldown = HEAVY_COOLDOWN;
         attacker.element.classList.add('heavy-attack');
     } else {
-        attacker.lightCooldown = 500; // 0.5 seconds
+        attacker.lightCooldown = LIGHT_COOLDOWN;
         attacker.element.classList.add('light-attack');
     }
 
@@ -134,20 +205,35 @@ function performAttack(attacker, defender, damage, isHeavy) {
     const defenderCenter = defender.x + 30;
     const distance = Math.abs(attackerCenter - defenderCenter);
 
-    // Only apply damage and knockback if in range
-    if (distance <= ATTACK_RANGE) {
+    // Only apply damage and effects if in range and target is not invincible
+    if (distance <= ATTACK_RANGE && !defender.invincible) {
         // Apply damage
         defender.health = Math.max(0, defender.health - damage);
         
-        // Knockback
+        // Apply knockback
         const direction = attackerCenter < defenderCenter ? 1 : -1;
         defender.velX = KNOCKBACK_FORCE * direction;
         
-        // Create hit effect on defender
+        // Apply stun effect
+        defender.isStunned = true;
+        defender.stunDuration = isHeavy ? 
+            characterStats[attacker === player1 ? player1Character : player2Character].heavyStunDuration :
+            characterStats[attacker === player1 ? player1Character : player2Character].lightStunDuration;
+        
+        // Add visual stun and knockback effects
+        defender.element.classList.add('stunned');
+        defender.element.classList.add('knockback');
+        
+        // Create hit effect
         createHitEffect(defender.x + 30, 50, isHeavy);
         
         // Update ultimate meter
         attacker.ultimate = Math.min(100, attacker.ultimate + damage);
+        
+        // Remove knockback class after animation
+        setTimeout(() => {
+            defender.element.classList.remove('knockback');
+        }, 500);
     }
     
     // Remove attack animation class
@@ -156,13 +242,16 @@ function performAttack(attacker, defender, damage, isHeavy) {
     }, 300);
 }
 
-// New function for attack effects
 function createAttackEffect(x, y, isHeavy, facing) {
     const effect = document.createElement('div');
     effect.className = `attack-effect ${isHeavy ? 'heavy' : 'light'}`;
+    
+    effect.style.position = 'absolute';
     effect.style.left = `${x}px`;
-    effect.style.top = `${y}px`;
+    effect.style.bottom = `${100 + y}px`;
     effect.style.transform = `scaleX(${facing})`;
+    effect.style.zIndex = '100';
+    
     document.querySelector('.game-container').appendChild(effect);
     
     setTimeout(() => effect.remove(), 300);
@@ -171,11 +260,14 @@ function createAttackEffect(x, y, isHeavy, facing) {
 function createHitEffect(x, y, isHeavy) {
     const effect = document.createElement('div');
     effect.className = `hit-effect ${isHeavy ? 'heavy' : 'light'}`;
+    
+    effect.style.position = 'absolute';
     effect.style.left = `${x}px`;
-    effect.style.top = `${y}px`;
+    effect.style.bottom = `${100 + y}px`;
+    effect.style.zIndex = '100';
+    
     document.querySelector('.game-container').appendChild(effect);
     
-    // Remove effect after animation
     setTimeout(() => effect.remove(), 300);
 }
 
@@ -193,23 +285,27 @@ function gameLoop() {
     );
 
     // Attack checks for Player 1
-    if (keys['z']) {
-        console.log('P1 Light Attack!');
+    if (keys['z'] && !player1.isStunned) {
         performAttack(player1, player2, characterStats[player1Character].lightDamage, false);
     }
-    if (keys['x']) {
-        console.log('P1 Heavy Attack!');
+    if (keys['x'] && !player1.isStunned) {
         performAttack(player1, player2, characterStats[player1Character].heavyDamage, true);
     }
 
     // Attack checks for Player 2
-    if (keys['o']) {
-        console.log('P2 Light Attack!');
+    if (keys['o'] && !player2.isStunned) {
         performAttack(player2, player1, characterStats[player2Character].lightDamage, false);
     }
-    if (keys['p']) {
-        console.log('P2 Heavy Attack!');
+    if (keys['p'] && !player2.isStunned) {
         performAttack(player2, player1, characterStats[player2Character].heavyDamage, true);
+    }
+
+    // Dodge controls
+    if (keys['v'] && !player1.isStunned) {
+        performDodge(player1);
+    }
+    if (keys['u'] && !player2.isStunned) {
+        performDodge(player2);
     }
 
     // Update health bars
@@ -227,12 +323,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Initialize players with debug logging
-console.log("Initializing players...");
-console.log("Player 2 character:", player2Character);
-console.log("Player 2 stats:", characterStats[player2Character]);
-
-// Update player initialization
+// Initialize players
 function initializePlayers() {
     // Set character type
     player1.element.setAttribute('data-character', player1Character);
@@ -247,9 +338,6 @@ function initializePlayers() {
     player2.element.classList.add('idle-animation');
 }
 
-// Call this after creating player objects
+// Initialize and start game
 initializePlayers();
-
-// Start the game loop with debug info
-console.log("Starting game loop...");
-gameLoop(); 
+gameLoop();

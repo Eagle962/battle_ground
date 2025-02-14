@@ -5,6 +5,8 @@ const characterStats = {
         speed: 4,
         lightDamage: 7,
         heavyDamage: 12,
+        lightStunDuration: 300, //light stun duration
+        heavyStunDuration: 800, //heavy stun duration
         style: 'linear-gradient(135deg, #e74c3c, #c0392b)',
         stats: {
             health: 3,
@@ -18,6 +20,8 @@ const characterStats = {
         speed: 7,
         lightDamage: 5,
         heavyDamage: 9,
+        lightStunDuration: 300, //light stun duration
+        heavyStunDuration: 800, //heavy stun duration
         style: 'linear-gradient(135deg, #3498db, #2980b9)',
         stats: {
             health: 2,
@@ -31,6 +35,8 @@ const characterStats = {
         speed: 5,
         lightDamage: 8,
         heavyDamage: 15,
+        lightStunDuration: 300, //light stun duration
+        heavyStunDuration: 800, //heavy stun duration
         style: 'linear-gradient(135deg, #9b59b6, #8e44ad)',
         stats: {
             health: 1,
