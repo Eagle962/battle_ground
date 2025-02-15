@@ -193,68 +193,86 @@ function performAttack(attacker, defender, damage, isHeavy) {
     const attackerCharacter = attacker === player1 ? player1Character : player2Character;
     const attackerStats = characterStats[attackerCharacter];
 
-    // Check cooldowns and stun status
+    // 檢查冷卻和暈眩狀態
     if (isHeavy && attacker.heavyCooldown > 0) return;
     if (!isHeavy && attacker.lightCooldown > 0) return;
     if (attacker.isStunned || attacker.isDodging) return;
 
-    // Set cooldown based on character stats
+    // 設置冷卻時間
     if (isHeavy) {
         attacker.heavyCooldown = attackerStats.heavyAttackCooldown;
-        attacker.element.classList.add('heavy-attack');
     } else {
         attacker.lightCooldown = attackerStats.lightAttackCooldown;
-        attacker.element.classList.add('light-attack');
     }
 
-    // Create attack effect in front of player
+    // 添加攻擊動畫類
+    const attackClass = isHeavy ? 'heavy-attack' : 'light-attack';
+    attacker.element.classList.add(attackClass);
+    
+    // 如果是戰士，添加精神體特效
+    if (attackerCharacter === 'warrior') {
+        // 精神體特效已通過 CSS 類處理，不需要額外的 DOM 元素
+        attacker.element.classList.add(attackClass);
+    }
+
+    // 計算攻擊位置
     const attackX = attacker.facing === 1 ? 
-        attacker.x - 30 : // Attack effect to the left when facing left
-        attacker.x + 60;  // Attack effect to the right when facing right
+        attacker.x - 30 : // 面向左側時的攻擊效果位置
+        attacker.x + 60;  // 面向右側時的攻擊效果位置
+
+    // 創建攻擊效果
     createAttackEffect(attackX, 50, isHeavy, attacker.facing);
 
-    // Calculate if hit lands
+    // 計算攻擊是否命中
     const attackerCenter = attacker.x + 30;
     const defenderCenter = defender.x + 30;
     const distance = Math.abs(attackerCenter - defenderCenter);
 
-    // Only apply damage and effects if in range and target is not invincible
+    // 只有在範圍內且目標不處於無敵狀態時才造成傷害
     if (distance <= attackerStats.attackRange && !defender.invincible) {
-        // Apply damage
+        // 造成傷害
         defender.health = Math.max(0, defender.health - damage);
         
-        // Apply knockback with character-specific force
+        // 擊退效果
         const direction = attackerCenter < defenderCenter ? 1 : -1;
         defender.velX = attackerStats.knockbackForce * direction;
         
-        // Apply stun effect
+        // 暈眩效果
         defender.isStunned = true;
         defender.stunDuration = isHeavy ? 
             attackerStats.heavyStunDuration :
             attackerStats.lightStunDuration;
         
-        // Add visual stun and knockback effects
+        // 添加視覺效果
         defender.element.classList.add('stunned');
         defender.element.classList.add('knockback');
         
-        // Create hit effect
+        // 創建命中效果
         createHitEffect(defender.x + 30, 50, isHeavy);
         
-        // Update ultimate meter - but NOT during warrior's time stop
+        // 更新大招能量 - 但不在戰士時間停止時更新
         if (!(attackerCharacter === 'warrior' && attacker.isInTimeStop)) {
-            attacker.ultimate = Math.min(attackerStats.ultimateRequired, attacker.ultimate + damage);
+            attacker.ultimate = Math.min(
+                attackerStats.ultimateRequired, 
+                attacker.ultimate + damage
+            );
         }
         
-        // Remove knockback class after animation
+        // 移除擊退動畫
         setTimeout(() => {
             defender.element.classList.remove('knockback');
         }, 500);
     }
     
-    // Remove attack animation class
+    // 移除攻擊動畫
+    const animationDuration = isHeavy ? 500 : 300;
     setTimeout(() => {
-        attacker.element.classList.remove('heavy-attack', 'light-attack');
-    }, 300);
+        attacker.element.classList.remove(attackClass);
+        // 如果是戰士，確保移除所有攻擊相關的類
+        if (attackerCharacter === 'warrior') {
+            attacker.element.classList.remove(attackClass);
+        }
+    }, animationDuration);
 }
 
 function createAttackEffect(x, y, isHeavy, facing) {
@@ -370,29 +388,53 @@ function performUltimate(player, opponent) {
     
     switch(playerCharacter) {
         case 'warrior':
-            // Time Stop Ultimate
+            // 創建時鐘特效
+            const clock = document.createElement('div');
+            clock.className = 'warrior-ultimate-clock';
+            document.body.appendChild(clock);
+            
+            setTimeout(() => clock.classList.add('active'), 0);
+            setTimeout(() => clock.remove(), 2000);
+
+            // 時間停止特效
             overlay.classList.add('time-stop-effect');
+            
+            // 暈眩對手
             opponent.isStunned = true;
             opponent.stunDuration = stats.ultimateDuration;
             
-            // Special handling for warrior - allow attacks during ultimate
-            player.isUsingUltimate = true; // Keep this true during the time stop
+            // 設置戰士狀態
+            player.isUsingUltimate = true; // 維持大招狀態
             player.isInTimeStop = true;
             
-            // Enhance warrior's attack range during time stop
+            // 增強攻擊範圍
             player.originalAttackRange = characterStats[playerCharacter].attackRange;
             characterStats[playerCharacter].attackRange = stats.ultimateAttackRange;
             
+            // 添加視覺效果
+            player.element.classList.add('using-ultimate');
+            
+            // 設置終止時間
             setTimeout(() => {
+                // 恢復對手狀態
                 opponent.isStunned = false;
                 opponent.stunDuration = 0;
+                opponent.element.classList.remove('stunned');
+                
+                // 恢復戰士狀態
                 player.isInTimeStop = false;
-                player.isUsingUltimate = false; // Remove ultimate state
-                player.element.classList.remove('using-ultimate'); // Remove animation class
-                // Restore original attack range
+                player.isUsingUltimate = false;
+                player.element.classList.remove('using-ultimate');
+                
+                // 恢復原始攻擊範圍
                 characterStats[playerCharacter].attackRange = player.originalAttackRange;
+                
+                // 移除特效
                 overlay.remove();
             }, stats.ultimateDuration);
+            
+            // 重置大招能量
+            player.ultimate = 0;
             break;
             
         case 'ninja':
@@ -581,6 +623,22 @@ function initializePlayers() {
     // Apply character styles
     player1.element.style.background = characterStats[player1Character].style;
     player2.element.style.background = characterStats[player2Character].style;
+
+    // Add spirit effect for warrior
+    if (player1Character === 'warrior') {
+        const spiritEffect = document.createElement('div');
+        spiritEffect.className = 'warrior-spirit';
+        player1.element.appendChild(spiritEffect);
+    }
+    if (player2Character === 'warrior') {
+        const spiritEffect = document.createElement('div');
+        spiritEffect.className = 'warrior-spirit';
+        player2.element.appendChild(spiritEffect);
+    }
+
+    // Set initial facing direction
+    player1.element.style.setProperty('--facing', player1.facing);
+    player2.element.style.setProperty('--facing', player2.facing);
 
     // Add idle animation class
     player1.element.classList.add('idle-animation');

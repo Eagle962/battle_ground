@@ -25,20 +25,42 @@
     z-index: 10;
 }
 
-.player::before {  /* Face details */
+
+
+.player[data-character="warrior"] {
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    background: #e74c3c;
+    position: relative;
+}
+
+/* 战士的头发 */
+.player[data-character="warrior"]::before {
     content: '';
     position: absolute;
-    top: 20px;
+    top: -10px;
     left: 50%;
     transform: translateX(-50%);
     width: 40px;
-    height: 20px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 10px;
+    height: 35px;
+    background: #f1c40f;
+    border-radius: 5px 5px 0 0;
+    clip-path: polygon(
+        0% 100%,
+        20% 60%,
+        40% 100%,
+        60% 60%,
+        80% 100%,
+        100% 60%,
+        100% 100%
+    );
+    z-index: 2;
 }
 
-.player::after {  /* Eyes */
-    content: '• •';
+/* 战士的面部 */
+.player[data-character="warrior"]::after {
+    content: '• •\A▬';
+    white-space: pre;
     position: absolute;
     top: 25px;
     left: 50%;
@@ -46,19 +68,124 @@
     color: #333;
     font-size: 14px;
     letter-spacing: 8px;
+    z-index: 2;
 }
 
-/* Warrior specific styles */
-.player[data-character="warrior"] {
+/* 新增: 战士攻击时的面部变化 */
+.player[data-character="warrior"].light-attack::after {
+    content: '• •\A⚔️';
+    animation: facialExpressionChange 0.3s;
+}
+
+.player[data-character="warrior"].heavy-attack::after {
+    content: '• •\A💥';
+    animation: facialExpressionChange 0.5s;
+}
+
+/* 新增: 面部表情动画 */
+@keyframes facialExpressionChange {
+    0% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.2); }
+    100% { transform: translateX(-50%) scale(1); }
+}
+
+/* 优化战士的精神体效果 */
+.warrior-spirit {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    width: calc(100% + 20px);
+    height: calc(100% + 20px);
+    background: #f1c40f;
+    opacity: 0;
     border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    pointer-events: none;
+    z-index: 1;
+    filter: blur(2px);
+    transform-origin: center center;
 }
 
-.player[data-character="warrior"]::before {
-    border-radius: 5px;
-    height: 25px;
+/* 优化攻击时的精神体动画 */
+.player[data-character="warrior"].light-attack .warrior-spirit {
+    animation: spiritPunchEnhanced 0.3s ease-in-out;
 }
 
+.player[data-character="warrior"].heavy-attack .warrior-spirit {
+    animation: spiritPunchEnhanced 0.5s ease-in-out;
+}
+
+/* Enhanced clock effect */
+.warrior-ultimate-clock {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    border: 15px solid #f1c40f;  /* Thicker border */
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 0 30px #f1c40f;  /* Add glow effect */
+}
+
+/* Enhanced clock markers */
+.warrior-ultimate-clock::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        #f1c40f 10deg,
+        transparent 20deg,
+        transparent 80deg,
+        #f1c40f 90deg,
+        transparent 100deg,
+        transparent 170deg,
+        #f1c40f 180deg,
+        transparent 190deg,
+        transparent 260deg,
+        #f1c40f 270deg,
+        transparent 280deg,
+        transparent 350deg,
+        #f1c40f 360deg
+    );
+    opacity: 0.5;
+    border-radius: 50%;
+    animation: clockRotate 2s linear;
+}
+
+@keyframes clockRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Enhanced clock appear animation */
+@keyframes clockAppear {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0) rotate(0deg);
+        box-shadow: 0 0 0 #f1c40f;
+    }
+    20% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.2) rotate(72deg);
+        box-shadow: 0 0 50px #f1c40f;
+    }
+    80% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1) rotate(288deg);
+        box-shadow: 0 0 30px #f1c40f;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.5) rotate(360deg);
+        box-shadow: 0 0 0 #f1c40f;
+    }
+}
 /* Ninja specific styles */
 .player[data-character="ninja"] {
     clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 100%, 0 100%, 0 20%);
@@ -81,12 +208,7 @@
     background: rgba(255, 255, 255, 0.6);
 }
 
-/* Add weapon effects */
-.player[data-character="warrior"]::after {
-    content: '• •\A▬';
-    white-space: pre;
-    font-size: 20px;
-}
+
 
 .player[data-character="ninja"]::after {
     content: '• •\A†';
@@ -224,9 +346,7 @@
 }
 
 /* Character-specific attack effects */
-.player[data-character="warrior"].light-attack::after {
-    content: '⚔️';
-}
+
 
 .player[data-character="ninja"].light-attack::after {
     content: '🌟';
@@ -236,9 +356,7 @@
     content: '✨';
 }
 
-.player[data-character="warrior"].heavy-attack::after {
-    content: '💥';
-}
+
 
 .player[data-character="ninja"].heavy-attack::after {
     content: '⚡';
