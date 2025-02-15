@@ -11,9 +11,12 @@ const characterStats = {
         heavyAttackCooldown: 4000,
         jumpForce: 11,         
         dodgeCooldown: 3500,   
-        ultimateRequired: 100,  
+        ultimateRequired: 50,  
         attackRange: 70,       
-        knockbackForce: 10,    
+        knockbackForce: 10,  
+        ultimateDuration: 5000,  // Time stop duration in ms
+        ultimateAttackRange: 150,  // Range during time stop
+        ultimateDamage: 0,  
         style: 'linear-gradient(135deg, #e74c3c, #c0392b)',
         stats: {
             health: 3,
@@ -33,9 +36,13 @@ const characterStats = {
         heavyAttackCooldown: 3000,
         jumpForce: 14,        
         dodgeCooldown: 2000,   
-        ultimateRequired: 90,   
+        ultimateRequired: 50,   
         attackRange: 60,       
-        knockbackForce: 6,     
+        knockbackForce: 6,  
+        ultimateDistance: 300,  // Dash distance for iaijutsu
+        ultimateDamage: 40,
+        ultimateWidth: 100,// Width of the slash effect
+
         style: 'linear-gradient(135deg, #3498db, #2980b9)',
         stats: {
             health: 2,
@@ -55,9 +62,12 @@ const characterStats = {
         heavyAttackCooldown: 5000,
         jumpForce: 10,         
         dodgeCooldown: 4000,   
-        ultimateRequired: 80,   
-        attackRange: 100,     
-        knockbackForce: 7,     
+        ultimateRequired: 20,   
+        attackRange: 250,     
+        knockbackForce: 7,    
+        ultimateRadius: 200, // Radius of the meteor strike
+        ultimateDamage: 50,
+        ultimateDelay: 1000, // Delay before meteor hits in ms 
         style: 'linear-gradient(135deg, #9b59b6, #8e44ad)',
         stats: {
             health: 1,

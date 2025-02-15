@@ -29,6 +29,9 @@ const player1 = {
     stunDuration: 0,
     isDodging: false,
     invincible: false,
+    isUsingUltimate: false,
+    isInTimeStop: false,
+    originalAttackRange: characterStats[player1Character].attackRange,
     dodgeStart: 0
 };
 
@@ -49,6 +52,9 @@ const player2 = {
     stunDuration: 0,
     isDodging: false,
     invincible: false,
+    isUsingUltimate: false,
+    isInTimeStop: false,
+    originalAttackRange: characterStats[player2Character].attackRange,
     dodgeStart: 0
 };
 
@@ -345,7 +351,124 @@ function showGameEndScreen(winner, winnerCharacter) {
         window.location.href = 'index.html';
     });
 }
+function performUltimate(player, opponent) {
+    const playerCharacter = player === player1 ? player1Character : player2Character;
+    const stats = characterStats[playerCharacter];
+    
+    // Check if ultimate is ready
+    if (player.ultimate < stats.ultimateRequired || player.isUsingUltimate) return;
+    
+    player.isUsingUltimate = true;
+    player.element.classList.add('using-ultimate');
+    
+    // Create overlay for effects
+    const overlay = document.createElement('div');
+    overlay.className = 'ultimate-overlay';
+    document.querySelector('.game-container').appendChild(overlay);
+    
+    switch(playerCharacter) {
+        case 'warrior':
+            // Time Stop Ultimate
+            overlay.classList.add('time-stop-effect');
+            opponent.isStunned = true;
+            opponent.stunDuration = stats.ultimateDuration;
+            
+            // Special handling for warrior - allow attacks during ultimate
+            player.isUsingUltimate = true; // Keep this true during the time stop
+            player.isInTimeStop = true;
+            
+            // Enhance warrior's attack range during time stop
+            player.originalAttackRange = characterStats[playerCharacter].attackRange;
+            characterStats[playerCharacter].attackRange = stats.ultimateAttackRange;
+            
+            setTimeout(() => {
+                opponent.isStunned = false;
+                opponent.stunDuration = 0;
+                player.isInTimeStop = false;
+                player.isUsingUltimate = false; // Remove ultimate state
+                player.element.classList.remove('using-ultimate'); // Remove animation class
+                // Restore original attack range
+                characterStats[playerCharacter].attackRange = player.originalAttackRange;
+                overlay.remove();
+            }, stats.ultimateDuration);
+            break;
+            
+        case 'ninja':
+            // Iaijutsu Ultimate
+            const originalX = player.x;
+            overlay.classList.add('iaijutsu-slash');
+            overlay.style.setProperty('--slash-width', `${stats.ultimateWidth}px`);
+            overlay.style.setProperty('--slash-distance', `${stats.ultimateDistance}px`);
+            overlay.style.left = `${player.x}px`;
+            
+            // Quick dash and damage
+            player.x += stats.ultimateDistance * (player.facing === 1 ? -1 : 1);
+            if (distance(player, opponent) <= stats.ultimateWidth) {
+                opponent.health = Math.max(0, opponent.health - stats.ultimateDamage);
+                createHitEffect(opponent.x + 30, 50, true);
+                opponent.isStunned = true;
+                opponent.stunDuration = 500;
+            }
+            
+            setTimeout(() => endUltimate(player, overlay), 500);
+            break;
+            
+        case 'mage':
+            // Meteor Strike Ultimate
+            const targetX = opponent.x + 30;
+            const targetY = 50;
+                
+            // Warning indicator
+            const warning = document.createElement('div');
+            warning.className = 'meteor-warning';
+            warning.style.left = `${targetX - stats.ultimateRadius}px`;
+            warning.style.bottom = `${100 + targetY - stats.ultimateRadius}px`;
+            warning.style.width = `${stats.ultimateRadius * 2}px`;
+            warning.style.height = `${stats.ultimateRadius * 2}px`;
+            overlay.appendChild(warning);
+                
+            setTimeout(() => {
+                warning.remove();
+                const meteor = document.createElement('div');
+                meteor.className = 'meteor';
+                meteor.style.left = `${targetX - stats.ultimateRadius}px`;
+                meteor.style.bottom = `${100 + targetY - stats.ultimateRadius}px`;
+                meteor.style.width = `${stats.ultimateRadius * 2}px`;
+                meteor.style.height = `${stats.ultimateRadius * 2}px`;
+                overlay.appendChild(meteor);
+                    
+                // 修正傷害判定
+                const opponentCenterX = opponent.x + 30;
+                const distanceToMeteor = Math.abs(opponentCenterX - targetX);
+                    
+                // 如果對手在隕石範圍內
+                if (distanceToMeteor <= stats.ultimateRadius) {
+                    opponent.health = Math.max(0, opponent.health - stats.ultimateDamage);
+                    opponent.isStunned = true;
+                    opponent.stunDuration = 1000;
+                    createHitEffect(opponent.x + 30, 50, true);
+                }
+                    
+                setTimeout(() => endUltimate(player, overlay), 500);
+            }, stats.ultimateDelay);
+            break;
+    }
+    
+    // Reset ultimate meter
+    player.ultimate = 0;
+}
 
+function endUltimate(player, overlay) {
+    player.isUsingUltimate = false;
+    player.element.classList.remove('using-ultimate');
+    overlay.remove();
+}
+
+function distance(player1, player2) {
+    const p1Center = player1.x + 30;
+    const p2Center = player2.x + 30;
+    return Math.abs(p1Center - p2Center);
+}
 // Main game loop
 function gameLoop() {
     // Check if game has ended before updating
@@ -363,26 +486,54 @@ function gameLoop() {
         );
 
         // Attack checks for Player 1
-        if (keys['z'] && !player1.isStunned) {
-            performAttack(player1, player2, characterStats[player1Character].lightDamage, false);
+        const canAttack1 = !player1.isStunned && !player1.isDodging && 
+            (!player1.isUsingUltimate || (player1Character === 'warrior' && player1.isInTimeStop));
+        
+        if (keys['z'] && canAttack1) {
+            const damage = player1.isInTimeStop ? 
+                characterStats[player1Character].lightDamage * 1.0 :
+                characterStats[player1Character].lightDamage;
+            performAttack(player1, player2, damage, false);
         }
-        if (keys['x'] && !player1.isStunned) {
-            performAttack(player1, player2, characterStats[player1Character].heavyDamage, true);
+        if (keys['x'] && canAttack1) {
+            const damage = player1.isInTimeStop ? 
+                characterStats[player1Character].heavyDamage * 1.0 :
+                characterStats[player1Character].heavyDamage;
+            performAttack(player1, player2, damage, true);
         }
 
         // Attack checks for Player 2
-        if (keys['o'] && !player2.isStunned) {
-            performAttack(player2, player1, characterStats[player2Character].lightDamage, false);
+        const canAttack2 = !player2.isStunned && !player2.isDodging && 
+            (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
+        
+        if (keys['o'] && canAttack2) {
+            const damage = player2.isInTimeStop ? 
+                characterStats[player2Character].lightDamage * 1.0 :
+                characterStats[player2Character].lightDamage;
+            performAttack(player2, player1, damage, false);
         }
-        if (keys['p'] && !player2.isStunned) {
-            performAttack(player2, player1, characterStats[player2Character].heavyDamage, true);
+        if (keys['p'] && canAttack2) {
+            const damage = player2.isInTimeStop ? 
+                characterStats[player2Character].heavyDamage * 1.0 :
+                characterStats[player2Character].heavyDamage;
+            performAttack(player2, player1, damage, true);
+        }
+
+        // Ultimate controls
+        if (keys['c'] && !player1.isStunned && !player1.isDodging && 
+            (player1.ultimate >= characterStats[player1Character].ultimateRequired) && !player1.isUsingUltimate) {
+            performUltimate(player1, player2);
+        }
+        if (keys['i'] && !player2.isStunned && !player2.isDodging && 
+            (player2.ultimate >= characterStats[player2Character].ultimateRequired) && !player2.isUsingUltimate) {
+            performUltimate(player2, player1);
         }
 
         // Dodge controls
-        if (keys['v'] && !player1.isStunned) {
+        if (keys['v'] && !player1.isStunned && !player1.isUsingUltimate && !player1.isDodging) {
             performDodge(player1);
         }
-        if (keys['u'] && !player2.isStunned) {
+        if (keys['u'] && !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
             performDodge(player2);
         }
 
@@ -394,21 +545,25 @@ function gameLoop() {
 
         // Update ultimate meters
         document.getElementById('ultimate1-fill').style.width = 
-            `${(player1.ultimate / 100) * 100}%`;
+            `${(player1.ultimate / characterStats[player1Character].ultimateRequired) * 100}%`;
         document.getElementById('ultimate2-fill').style.width = 
-            `${(player2.ultimate / 100) * 100}%`;
+            `${(player2.ultimate / characterStats[player2Character].ultimateRequired) * 100}%`;
 
         // Update cooldown displays
         const p1LightCd = document.getElementById('p1-light-cd');
         const p1HeavyCd = document.getElementById('p1-heavy-cd');
-        if (p1LightCd) p1LightCd.style.width = `${Math.max(0, (player1.lightCooldown / characterStats[player1Character].lightAttackCooldown) * 100)}%`;
-        if (p1HeavyCd) p1HeavyCd.style.width = `${Math.max(0, (player1.heavyCooldown / characterStats[player1Character].heavyAttackCooldown) * 100)}%`;
+        if (p1LightCd) p1LightCd.style.width = 
+            `${Math.max(0, (player1.lightCooldown / characterStats[player1Character].lightAttackCooldown) * 100)}%`;
+        if (p1HeavyCd) p1HeavyCd.style.width = 
+            `${Math.max(0, (player1.heavyCooldown / characterStats[player1Character].heavyAttackCooldown) * 100)}%`;
         
-        // Player 2
+        // Player 2 cooldown displays
         const p2LightCd = document.getElementById('p2-light-cd');
         const p2HeavyCd = document.getElementById('p2-heavy-cd');
-        if (p2LightCd) p2LightCd.style.width = `${Math.max(0, (player2.lightCooldown / characterStats[player2Character].lightAttackCooldown) * 100)}%`;
-        if (p2HeavyCd) p2HeavyCd.style.width = `${Math.max(0, (player2.heavyCooldown / characterStats[player2Character].heavyAttackCooldown) * 100)}%`;
+        if (p2LightCd) p2LightCd.style.width = 
+            `${Math.max(0, (player2.lightCooldown / characterStats[player2Character].lightAttackCooldown) * 100)}%`;
+        if (p2HeavyCd) p2HeavyCd.style.width = 
+            `${Math.max(0, (player2.heavyCooldown / characterStats[player2Character].heavyAttackCooldown) * 100)}%`;
 
         // Continue the game loop
         requestAnimationFrame(gameLoop);
