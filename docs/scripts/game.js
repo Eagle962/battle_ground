@@ -69,30 +69,10 @@ document.addEventListener('keyup', (e) => {
     else keys[e.key.toLowerCase()] = false;
 });
 
-function performDodge(player) {
-    if (player.dodgeCooldown > 0 || player.isStunned || player.isDodging) return;
-
-    player.isDodging = true;
-    player.invincible = true;
-    player.dodgeStart = Date.now();
-    player.dodgeCooldown = DODGE_COOLDOWN;
-    
-    // Add dodge animation class
-    player.element.classList.add('dodging');
-    
-    // Move player in facing direction
-    player.velX = -player.facing * 3; // Dodge speed
-    
-    // Remove dodge state after animation
-    setTimeout(() => {
-        player.isDodging = false;
-        player.invincible = false;
-        player.element.classList.remove('dodging');
-        player.velX = 0;
-    }, 400); // Match this with the CSS animation duration
-}
-
 function updatePlayer(player, opponent, moveKeys, attackKeys) {
+    const playerCharacter = player === player1 ? player1Character : player2Character;
+    const stats = characterStats[playerCharacter];
+
     // Update stun duration
     if (player.stunDuration > 0) {
         player.stunDuration -= 16; // Decrease stun duration (16ms is roughly one frame)
@@ -105,7 +85,7 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
     // If stunned or dodging, only apply current movement and gravity
     if (player.isStunned || player.isDodging) {
         // Apply gravity
-        player.velY += GRAVITY;
+        player.velY += 0.5; // Gravity is kept constant for game feel
         player.y += player.velY;
         
         // Apply current movement
@@ -140,11 +120,11 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
 
     // Regular movement only if not stunned and not dodging
     if (keys[moveKeys.left]) {
-        player.velX = -MOVE_SPEED;
+        player.velX = -stats.speed;
         player.facing = 1;
         player.element.style.setProperty('--facing', player.facing);
     } else if (keys[moveKeys.right]) {
-        player.velX = MOVE_SPEED;
+        player.velX = stats.speed;
         player.facing = -1;
         player.element.style.setProperty('--facing', player.facing);
     } else {
@@ -152,7 +132,7 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
     }
 
     // Apply gravity and update position
-    player.velY += GRAVITY;
+    player.velY += 0.5; // Gravity is kept constant for game feel
     player.y += player.velY;
     player.x += player.velX;
 
@@ -177,8 +157,33 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
     player.element.style.transform = `scaleX(${player.facing})`;
 }
 
+function performDodge(player) {
+    const playerCharacter = player === player1 ? player1Character : player2Character;
+    const stats = characterStats[playerCharacter];
+    
+    if (player.dodgeCooldown > 0 || player.isStunned || player.isDodging) return;
+
+    player.isDodging = true;
+    player.invincible = true;
+    player.dodgeStart = Date.now();
+    player.dodgeCooldown = stats.dodgeCooldown;
+    
+    // Add dodge animation class
+    player.element.classList.add('dodging');
+    
+    // Move player in facing direction with character-specific speed
+    player.velX = -player.facing * (stats.speed * 1.5); // Dodge speed is 1.5x movement speed
+    
+    // Remove dodge state after animation
+    setTimeout(() => {
+        player.isDodging = false;
+        player.invincible = false;
+        player.element.classList.remove('dodging');
+        player.velX = 0;
+    }, 400); // Match this with the CSS animation duration
+}
+
 function performAttack(attacker, defender, damage, isHeavy) {
-    // Get character stats for cooldown times
     const attackerCharacter = attacker === player1 ? player1Character : player2Character;
     const attackerStats = characterStats[attackerCharacter];
 
@@ -208,19 +213,19 @@ function performAttack(attacker, defender, damage, isHeavy) {
     const distance = Math.abs(attackerCenter - defenderCenter);
 
     // Only apply damage and effects if in range and target is not invincible
-    if (distance <= ATTACK_RANGE && !defender.invincible) {
+    if (distance <= attackerStats.attackRange && !defender.invincible) {
         // Apply damage
         defender.health = Math.max(0, defender.health - damage);
         
-        // Apply knockback
+        // Apply knockback with character-specific force
         const direction = attackerCenter < defenderCenter ? 1 : -1;
-        defender.velX = KNOCKBACK_FORCE * direction;
+        defender.velX = attackerStats.knockbackForce * direction;
         
         // Apply stun effect
         defender.isStunned = true;
         defender.stunDuration = isHeavy ? 
-            characterStats[attackerCharacter].heavyStunDuration :
-            characterStats[attackerCharacter].lightStunDuration;
+            attackerStats.heavyStunDuration :
+            attackerStats.lightStunDuration;
         
         // Add visual stun and knockback effects
         defender.element.classList.add('stunned');
@@ -230,7 +235,7 @@ function performAttack(attacker, defender, damage, isHeavy) {
         createHitEffect(defender.x + 30, 50, isHeavy);
         
         // Update ultimate meter
-        attacker.ultimate = Math.min(100, attacker.ultimate + damage);
+        attacker.ultimate = Math.min(attackerStats.ultimateRequired, attacker.ultimate + damage);
         
         // Remove knockback class after animation
         setTimeout(() => {
