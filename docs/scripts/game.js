@@ -240,8 +240,10 @@ function performAttack(attacker, defender, damage, isHeavy) {
         // Create hit effect
         createHitEffect(defender.x + 30, 50, isHeavy);
         
-        // Update ultimate meter
-        attacker.ultimate = Math.min(attackerStats.ultimateRequired, attacker.ultimate + damage);
+        // Update ultimate meter - but NOT during warrior's time stop
+        if (!(attackerCharacter === 'warrior' && attacker.isInTimeStop)) {
+            attacker.ultimate = Math.min(attackerStats.ultimateRequired, attacker.ultimate + damage);
+        }
         
         // Remove knockback class after animation
         setTimeout(() => {
