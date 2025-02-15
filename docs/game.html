@@ -63,5 +63,14 @@
 
     <script src="./scripts/characters.js"></script>
     <script src="./scripts/game.js"></script>
+    <script src="./scripts/com.js"></script>
+    <script>
+        // Check if it's computer mode
+        const player2Character = localStorage.getItem('player2Character');
+        if (player2Character) {
+            const computerAI = new ComputerAI(player2, player1, characterStats[player2Character]);
+            computerAI.start();
+        }
+    </script>
 </body>
 </html>

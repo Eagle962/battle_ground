@@ -475,13 +475,16 @@ function distance(player1, player2) {
 function gameLoop() {
     // Check if game has ended before updating
     if (!checkGameEnd()) {
+        // Check if it's computer mode
+        const isComputerMode = localStorage.getItem('player2Character') !== null;
+
         // Update player 1 (WASD controls)
         updatePlayer(player1, player2, 
             { left: 'a', right: 'd' },
             { light: 'z', heavy: 'x' }
         );
 
-        // Update player 2 (Arrow keys)
+        // Update player 2 (Arrow keys or Computer AI)
         updatePlayer(player2, player1,
             { left: 'arrowleft', right: 'arrowright' },
             { light: 'o', heavy: 'p' }
@@ -508,17 +511,33 @@ function gameLoop() {
         const canAttack2 = !player2.isStunned && !player2.isDodging && 
             (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
         
-        if (keys['o'] && canAttack2) {
-            const damage = player2.isInTimeStop ? 
-                characterStats[player2Character].lightDamage * 1.0 :
-                characterStats[player2Character].lightDamage;
-            performAttack(player2, player1, damage, false);
-        }
-        if (keys['p'] && canAttack2) {
-            const damage = player2.isInTimeStop ? 
-                characterStats[player2Character].heavyDamage * 1.0 :
-                characterStats[player2Character].heavyDamage;
-            performAttack(player2, player1, damage, true);
+        // For computer mode, simulate attacks using predefined AI logic
+        if (isComputerMode) {
+            // Implement computer AI attack logic here
+            // This could be based on interval, random chance, or specific conditions
+            const randomAttackChance = Math.random();
+            if (randomAttackChance < 0.3 && canAttack2) {
+                const damage = characterStats[player2Character].lightDamage;
+                performAttack(player2, player1, damage, false);
+            }
+            if (randomAttackChance > 0.7 && canAttack2) {
+                const damage = characterStats[player2Character].heavyDamage;
+                performAttack(player2, player1, damage, true);
+            }
+        } else {
+            // Regular PvP attack checks
+            if (keys['o'] && canAttack2) {
+                const damage = player2.isInTimeStop ? 
+                    characterStats[player2Character].lightDamage * 1.0 :
+                    characterStats[player2Character].lightDamage;
+                performAttack(player2, player1, damage, false);
+            }
+            if (keys['p'] && canAttack2) {
+                const damage = player2.isInTimeStop ? 
+                    characterStats[player2Character].heavyDamage * 1.0 :
+                    characterStats[player2Character].heavyDamage;
+                performAttack(player2, player1, damage, true);
+            }
         }
 
         // Ultimate controls
@@ -526,17 +545,41 @@ function gameLoop() {
             (player1.ultimate >= characterStats[player1Character].ultimateRequired) && !player1.isUsingUltimate) {
             performUltimate(player1, player2);
         }
-        if (keys['i'] && !player2.isStunned && !player2.isDodging && 
-            (player2.ultimate >= characterStats[player2Character].ultimateRequired) && !player2.isUsingUltimate) {
-            performUltimate(player2, player1);
+
+        // For computer mode, add simple ultimate logic
+        if (isComputerMode) {
+            const ultimateChance = Math.random();
+            if (ultimateChance < 0.1 && // 10% chance 
+                !player2.isStunned && !player2.isDodging && 
+                (player2.ultimate >= characterStats[player2Character].ultimateRequired) && 
+                !player2.isUsingUltimate) {
+                performUltimate(player2, player1);
+            }
+        } else {
+            // Regular PvP ultimate control
+            if (keys['i'] && !player2.isStunned && !player2.isDodging && 
+                (player2.ultimate >= characterStats[player2Character].ultimateRequired) && !player2.isUsingUltimate) {
+                performUltimate(player2, player1);
+            }
         }
 
         // Dodge controls
         if (keys['v'] && !player1.isStunned && !player1.isUsingUltimate && !player1.isDodging) {
             performDodge(player1);
         }
-        if (keys['u'] && !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
-            performDodge(player2);
+
+        // For computer mode, add dodge logic
+        if (isComputerMode) {
+            const dodgeChance = Math.random();
+            if (dodgeChance < 0.2 && // 20% chance
+                !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
+                performDodge(player2);
+            }
+        } else {
+            // Regular PvP dodge control
+            if (keys['u'] && !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
+                performDodge(player2);
+            }
         }
 
         // Update health bars
