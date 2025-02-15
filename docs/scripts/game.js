@@ -6,8 +6,6 @@ const player2Character = localStorage.getItem('player2Character');
 const GRAVITY = 0.5;
 const JUMP_FORCE = 12;
 const MOVE_SPEED = 5;
-const LIGHT_COOLDOWN = 500;
-const HEAVY_COOLDOWN = 1000;
 const DODGE_COOLDOWN = 3000;
 const ULTIMATE_REQUIRED = 100;
 const ATTACK_RANGE = 80;
@@ -180,24 +178,28 @@ function updatePlayer(player, opponent, moveKeys, attackKeys) {
 }
 
 function performAttack(attacker, defender, damage, isHeavy) {
+    // Get character stats for cooldown times
+    const attackerCharacter = attacker === player1 ? player1Character : player2Character;
+    const attackerStats = characterStats[attackerCharacter];
+
     // Check cooldowns and stun status
     if (isHeavy && attacker.heavyCooldown > 0) return;
     if (!isHeavy && attacker.lightCooldown > 0) return;
     if (attacker.isStunned || attacker.isDodging) return;
 
-    // Always play attack animation
+    // Set cooldown based on character stats
     if (isHeavy) {
-        attacker.heavyCooldown = HEAVY_COOLDOWN;
+        attacker.heavyCooldown = attackerStats.heavyAttackCooldown;
         attacker.element.classList.add('heavy-attack');
     } else {
-        attacker.lightCooldown = LIGHT_COOLDOWN;
+        attacker.lightCooldown = attackerStats.lightAttackCooldown;
         attacker.element.classList.add('light-attack');
     }
 
     // Create attack effect in front of player
     const attackX = attacker.facing === 1 ? 
-        attacker.x + 60 : // Attack effect to the right
-        attacker.x - 30;  // Attack effect to the left
+        attacker.x - 30 : // Attack effect to the left when facing left
+        attacker.x + 60;  // Attack effect to the right when facing right
     createAttackEffect(attackX, 50, isHeavy, attacker.facing);
 
     // Calculate if hit lands
@@ -217,8 +219,8 @@ function performAttack(attacker, defender, damage, isHeavy) {
         // Apply stun effect
         defender.isStunned = true;
         defender.stunDuration = isHeavy ? 
-            characterStats[attacker === player1 ? player1Character : player2Character].heavyStunDuration :
-            characterStats[attacker === player1 ? player1Character : player2Character].lightStunDuration;
+            characterStats[attackerCharacter].heavyStunDuration :
+            characterStats[attackerCharacter].lightStunDuration;
         
         // Add visual stun and knockback effects
         defender.element.classList.add('stunned');
@@ -249,7 +251,7 @@ function createAttackEffect(x, y, isHeavy, facing) {
     effect.style.position = 'absolute';
     effect.style.left = `${x}px`;
     effect.style.bottom = `${100 + y}px`;
-    effect.style.transform = `scaleX(${facing})`;
+    effect.style.transform = `scaleX(${-facing})`;
     effect.style.zIndex = '100';
     
     document.querySelector('.game-container').appendChild(effect);
@@ -270,57 +272,142 @@ function createHitEffect(x, y, isHeavy) {
     
     setTimeout(() => effect.remove(), 300);
 }
+// end game logic 
+function checkGameEnd() {
+    if (player1.health <= 0 || player2.health <= 0) {
+        const winner = player1.health > 0 ? player1 : player2;
+        const winnerCharacter = player1.health > 0 ? player1Character : player2Character;
+        showGameEndScreen(winner, winnerCharacter);
+        return true;
+    }
+    return false;
+}
 
+function showGameEndScreen(winner, winnerCharacter) {
+    const gameEndScreen = document.querySelector('.game-end-screen');
+    const winnerCharacterElement = document.querySelector('.winner-character');
+    
+    // Update winner text
+    winnerCharacterElement.textContent = characterStats[winnerCharacter].name;
+    
+    // Show the end screen
+    gameEndScreen.classList.add('active');
+    
+    // Add event listeners to buttons
+    const playAgainButton = document.querySelector('.play-again');
+    const returnMenuButton = document.querySelector('.return-menu');
+    
+    playAgainButton.addEventListener('click', () => {
+        location.reload();
+    });
+    
+    returnMenuButton.addEventListener('click', () => {
+        window.location.href = 'index.html';
+    });
+}
+
+// Check if game has ended
+function checkGameEnd() {
+    if (player1.health <= 0 || player2.health <= 0) {
+        const winner = player1.health > 0 ? player1 : player2;
+        const winnerCharacter = player1.health > 0 ? player1Character : player2Character;
+        showGameEndScreen(winner, winnerCharacter);
+        return true;
+    }
+    return false;
+}
+
+// Show the game end screen
+function showGameEndScreen(winner, winnerCharacter) {
+    const gameEndScreen = document.querySelector('.game-end-screen');
+    const winnerCharacterElement = document.querySelector('.winner-character');
+    
+    // Update winner text
+    winnerCharacterElement.textContent = characterStats[winnerCharacter].name;
+    
+    // Show the end screen
+    gameEndScreen.classList.add('active');
+    
+    // Add event listeners to buttons
+    const playAgainButton = document.querySelector('.play-again');
+    const returnMenuButton = document.querySelector('.return-menu');
+    
+    playAgainButton.addEventListener('click', () => {
+        location.reload();
+    });
+    
+    returnMenuButton.addEventListener('click', () => {
+        window.location.href = 'index.html';
+    });
+}
+
+// Main game loop
 function gameLoop() {
-    // Update player 1 (WASD controls)
-    updatePlayer(player1, player2, 
-        { left: 'a', right: 'd' },
-        { light: 'z', heavy: 'x' }
-    );
+    // Check if game has ended before updating
+    if (!checkGameEnd()) {
+        // Update player 1 (WASD controls)
+        updatePlayer(player1, player2, 
+            { left: 'a', right: 'd' },
+            { light: 'z', heavy: 'x' }
+        );
 
-    // Update player 2 (Arrow keys)
-    updatePlayer(player2, player1,
-        { left: 'arrowleft', right: 'arrowright' },
-        { light: 'o', heavy: 'p' }
-    );
+        // Update player 2 (Arrow keys)
+        updatePlayer(player2, player1,
+            { left: 'arrowleft', right: 'arrowright' },
+            { light: 'o', heavy: 'p' }
+        );
 
-    // Attack checks for Player 1
-    if (keys['z'] && !player1.isStunned) {
-        performAttack(player1, player2, characterStats[player1Character].lightDamage, false);
+        // Attack checks for Player 1
+        if (keys['z'] && !player1.isStunned) {
+            performAttack(player1, player2, characterStats[player1Character].lightDamage, false);
+        }
+        if (keys['x'] && !player1.isStunned) {
+            performAttack(player1, player2, characterStats[player1Character].heavyDamage, true);
+        }
+
+        // Attack checks for Player 2
+        if (keys['o'] && !player2.isStunned) {
+            performAttack(player2, player1, characterStats[player2Character].lightDamage, false);
+        }
+        if (keys['p'] && !player2.isStunned) {
+            performAttack(player2, player1, characterStats[player2Character].heavyDamage, true);
+        }
+
+        // Dodge controls
+        if (keys['v'] && !player1.isStunned) {
+            performDodge(player1);
+        }
+        if (keys['u'] && !player2.isStunned) {
+            performDodge(player2);
+        }
+
+        // Update health bars
+        document.getElementById('health1-fill').style.width = 
+            `${(player1.health / player1.maxHealth) * 100}%`;
+        document.getElementById('health2-fill').style.width = 
+            `${(player2.health / player2.maxHealth) * 100}%`;
+
+        // Update ultimate meters
+        document.getElementById('ultimate1-fill').style.width = 
+            `${(player1.ultimate / 100) * 100}%`;
+        document.getElementById('ultimate2-fill').style.width = 
+            `${(player2.ultimate / 100) * 100}%`;
+
+        // Update cooldown displays
+        const p1LightCd = document.getElementById('p1-light-cd');
+        const p1HeavyCd = document.getElementById('p1-heavy-cd');
+        if (p1LightCd) p1LightCd.style.width = `${Math.max(0, (player1.lightCooldown / characterStats[player1Character].lightAttackCooldown) * 100)}%`;
+        if (p1HeavyCd) p1HeavyCd.style.width = `${Math.max(0, (player1.heavyCooldown / characterStats[player1Character].heavyAttackCooldown) * 100)}%`;
+        
+        // Player 2
+        const p2LightCd = document.getElementById('p2-light-cd');
+        const p2HeavyCd = document.getElementById('p2-heavy-cd');
+        if (p2LightCd) p2LightCd.style.width = `${Math.max(0, (player2.lightCooldown / characterStats[player2Character].lightAttackCooldown) * 100)}%`;
+        if (p2HeavyCd) p2HeavyCd.style.width = `${Math.max(0, (player2.heavyCooldown / characterStats[player2Character].heavyAttackCooldown) * 100)}%`;
+
+        // Continue the game loop
+        requestAnimationFrame(gameLoop);
     }
-    if (keys['x'] && !player1.isStunned) {
-        performAttack(player1, player2, characterStats[player1Character].heavyDamage, true);
-    }
-
-    // Attack checks for Player 2
-    if (keys['o'] && !player2.isStunned) {
-        performAttack(player2, player1, characterStats[player2Character].lightDamage, false);
-    }
-    if (keys['p'] && !player2.isStunned) {
-        performAttack(player2, player1, characterStats[player2Character].heavyDamage, true);
-    }
-
-    // Dodge controls
-    if (keys['v'] && !player1.isStunned) {
-        performDodge(player1);
-    }
-    if (keys['u'] && !player2.isStunned) {
-        performDodge(player2);
-    }
-
-    // Update health bars
-    document.getElementById('health1-fill').style.width = 
-        `${(player1.health / player1.maxHealth) * 100}%`;
-    document.getElementById('health2-fill').style.width = 
-        `${(player2.health / player2.maxHealth) * 100}%`;
-
-    // Update ultimate meters
-    document.getElementById('ultimate1-fill').style.width = 
-        `${(player1.ultimate / 100) * 100}%`;
-    document.getElementById('ultimate2-fill').style.width = 
-        `${(player2.ultimate / 100) * 100}%`;
-
-    requestAnimationFrame(gameLoop);
 }
 
 // Initialize players

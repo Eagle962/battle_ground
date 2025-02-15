@@ -7,6 +7,8 @@ const characterStats = {
         heavyDamage: 12,
         lightStunDuration: 300, //light stun duration
         heavyStunDuration: 800, //heavy stun duration
+        lightAttackCooldown: 2000, // 2 seconds
+        heavyAttackCooldown: 4000, // 4 seconds
         style: 'linear-gradient(135deg, #e74c3c, #c0392b)',
         stats: {
             health: 3,
@@ -22,6 +24,8 @@ const characterStats = {
         heavyDamage: 9,
         lightStunDuration: 300, //light stun duration
         heavyStunDuration: 800, //heavy stun duration
+        lightAttackCooldown: 1500, // 1.5 seconds (faster than warrior)
+        heavyAttackCooldown: 3000, // 3 seconds (faster than warrior)
         style: 'linear-gradient(135deg, #3498db, #2980b9)',
         stats: {
             health: 2,
@@ -37,6 +41,8 @@ const characterStats = {
         heavyDamage: 15,
         lightStunDuration: 300, //light stun duration
         heavyStunDuration: 800, //heavy stun duration
+        lightAttackCooldown: 2500, // 2.5 seconds (slower but more powerful)
+        heavyAttackCooldown: 5000, // 5 seconds (slower but more powerful)
         style: 'linear-gradient(135deg, #9b59b6, #8e44ad)',
         stats: {
             health: 1,
