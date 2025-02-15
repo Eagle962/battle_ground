@@ -66,12 +66,37 @@
     <script src="./scripts/game.js"></script>
     
     <script>
-        // Check if it's computer mode
-        const player2Character = localStorage.getItem('player2Character');
-        if (player2Character) {
-            const computerAI = new ComputerAI(player2, player1, characterStats[player2Character]);
-            computerAI.start();
+        // Initialize game
+    function initGame() {
+            initializePlayers();
+            
+            // Initialize AI if in computer mode
+            const gameMode = localStorage.getItem('gameMode');
+            const player2Character = localStorage.getItem('player2Character');
+            
+            if (gameMode === 'computer' && player2Character) {
+                // Stop any existing AI
+                if (window.computerAI) {
+                    window.computerAI.stop();
+                }
+                
+                // Create and start new AI
+                window.computerAI = new ComputerAI(player2, player1, characterStats[player2Character]);
+                window.computerAI.start();
+                
+                // Hide player 2 controls
+                const player2Controls = document.querySelector('.player2-controls');
+                if (player2Controls) {
+                    player2Controls.style.display = 'none';
+                }
+            }
+            
+            // Start game loop
+            gameLoop();
         }
+
+        // Start the game when everything is loaded
+        window.addEventListener('load', initGame);
     </script>
 </body>
 </html>
