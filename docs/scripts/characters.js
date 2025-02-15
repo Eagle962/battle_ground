@@ -53,7 +53,7 @@ const characterStats = {
     mage: {
         name: 'Mage',
         health: 150,
-        speed: 4,            
+        speed: 10,            
         lightDamage: 8,
         heavyDamage: 15,
         lightStunDuration: 300,
