@@ -138,7 +138,7 @@
                         
                         player2Selection = computerCard.dataset.character;
                         computerCard.classList.add('selected');
-                        p2SelectionText.textContent = `Player 2: ${computerCard.querySelector('.character-name').textContent}`;
+                        p2SelectionText.textContent = `Player 2: ${computerCard.querySelector('.character-name').textContent} (Computer)`;
                         playerTurn.textContent = "Ready to Battle!";
                         startButton.disabled = false;
                     } else {
@@ -155,11 +155,24 @@
         });
 
         startButton.addEventListener('click', () => {
-            // Store selections for the game page
+            // Store game mode
+            localStorage.setItem('gameMode', isComputerMode ? 'computer' : 'pvp');
+            
+            // Store character selections
             localStorage.setItem('player1Character', player1Selection);
             localStorage.setItem('player2Character', player2Selection);
+            
+            // Navigate to game page
             window.location.href = 'game.html';
         });
+
+        // Check if there was a previous mode selected
+        const previousMode = localStorage.getItem('gameMode');
+        if (previousMode === 'computer') {
+            computerModeButton.click();
+        } else {
+            pvpModeButton.click();
+        }
     </script>
 </body>
 </html>

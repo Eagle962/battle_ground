@@ -1,297 +1,283 @@
 class ComputerAI {
-    constructor(player, opponent, stats) {
-        this.player = player;
-        this.opponent = opponent;
-        this.stats = stats;
-        this.decisionInterval = null;
-        this.difficulty = 0.9;
-        this.lastDecisionTime = Date.now();
-        this.decisionDelay = 100;
-        this.comboCooldown = 0;
-        this.lastPosition = this.player.x;
-        this.stuckCounter = 0;
-        this.preferredDistance = this.calculatePreferredDistance();
-        this.aggressionLevel = this.calculateAggressionLevel();
-        this.currentKey = null;
-        const playerCenter = this.player.x + 30;
-        const opponentCenter = this.opponent.x + 30;
-        this.player.facing = playerCenter < opponentCenter ? -1 : 1;
-        this.player.element.style.setProperty('--facing', this.player.facing);
-}
+    constructor(aiPlayer, humanPlayer, characterStats) {
+        this.ai = aiPlayer;
+        this.human = humanPlayer;
+        this.stats = characterStats;
+        this.lastActionTime = 0;
+        this.decisionInterval = 100; // Make decisions every 100ms
+        this.aggressiveness = 0.7; // Base aggressiveness (0-1)
+        this.defensiveness = 0.6; // Base defensiveness (0-1)
+        
+        // Strategy state
+        this.currentStrategy = 'neutral';
+        this.comboInProgress = false;
+        this.dodgeTimeout = null;
+        this.attackTimeout = null;
+        
+        // Distance preferences
+        this.preferredDistance = this.stats.attackRange * 0.9;
+        this.maxRange = this.stats.attackRange * 1.2;
+        this.dangerRange = this.stats.attackRange * 0.5;
+    }
 
     start() {
-        this.decisionInterval = setInterval(() => {
-            if (!this.player.isStunned && !this.player.isDodging) {
-                this.makeDecision();
-            }
-        }, this.decisionDelay);
+        this.gameLoop = setInterval(() => this.update(), this.decisionInterval);
     }
 
     stop() {
-        if (this.decisionInterval) {
-            clearInterval(this.decisionInterval);
-        }
-        this.releaseAllKeys();
+        clearInterval(this.gameLoop);
     }
 
-    releaseAllKeys() {
-        if (this.currentKey) {
-            this.releaseKey(this.currentKey);
-            this.currentKey = null;
-        }
-    }
-
-    calculateDistance() {
-        const playerCenter = this.player.x + 30;
-        const opponentCenter = this.opponent.x + 30;
-        return Math.abs(playerCenter - opponentCenter);
-    }
-
-    makeDecision() {
-        const distance = this.calculateDistance();
-        const healthRatio = this.player.health / this.stats.health;
-        const opponentHealthRatio = this.opponent.health / this.opponent.maxHealth;
+    update() {
+        if (this.ai.isStunned || this.ai.isDodging) return;
         
-        // Stuck detection
-        if (this.detectStuck()) {
-            this.performDodge();
-            this.stuckCounter = 0;
-            return;
+        const now = Date.now();
+        if (now - this.lastActionTime < 100) return; // Basic action throttling
+        
+        // Update strategy based on situation
+        this.updateStrategy();
+        
+        // Execute current strategy
+        this.executeStrategy();
+        
+        this.lastActionTime = now;
+    }
+
+    updateStrategy() {
+        const distance = this.getDistanceToHuman();
+        const aiHealthPercent = this.ai.health / this.stats.health;
+        const humanHealthPercent = this.human.health / this.human.maxHealth;
+        
+        // Adjust aggressiveness based on health difference
+        this.aggressiveness = 0.7 + (humanHealthPercent - aiHealthPercent) * 0.3;
+        
+        // Update current strategy
+        if (aiHealthPercent < 0.3) {
+            // Low health - become more defensive
+            this.currentStrategy = 'defensive';
+            this.defensiveness = 0.9;
+        } else if (humanHealthPercent < 0.3 && aiHealthPercent > 0.5) {
+            // Human low health - become aggressive
+            this.currentStrategy = 'aggressive';
+            this.aggressiveness = 0.9;
+        } else if (this.human.isStunned || this.human.isDodging) {
+            // Human vulnerable - capitalize
+            this.currentStrategy = 'punish';
+            this.aggressiveness = 1;
+        } else if (this.ai.ultimate >= this.stats.ultimateRequired) {
+            // Ultimate ready - look for opportunity
+            this.currentStrategy = 'ultimate';
+        } else {
+            // Default neutral strategy
+            this.currentStrategy = 'neutral';
         }
+    }
 
-        // Emergency actions
-        if (healthRatio < 0.3 && this.shouldDodge(distance)) {
-            this.performDodge();
-            return;
+    executeStrategy() {
+        const distance = this.getDistanceToHuman();
+        
+        // Handle movement
+        this.handleMovement(distance);
+        
+        // Handle combat actions based on strategy
+        switch (this.currentStrategy) {
+            case 'defensive':
+                this.executeDefensiveStrategy(distance);
+                break;
+            case 'aggressive':
+                this.executeAggressiveStrategy(distance);
+                break;
+            case 'punish':
+                this.executePunishStrategy(distance);
+                break;
+            case 'ultimate':
+                this.executeUltimateStrategy(distance);
+                break;
+            default:
+                this.executeNeutralStrategy(distance);
         }
+    }
 
-        // Ultimate check
-        if (this.shouldUseUltimate(healthRatio, opponentHealthRatio)) {
-            this.performUltimate();
-            return;
+    handleMovement(distance) {
+        // Clear existing movement keys
+        this.releaseMovementKeys();
+        
+        if (this.ai.isStunned || this.ai.isDodging) return;
+        
+        const targetDistance = this.currentStrategy === 'defensive' ? 
+            this.maxRange : this.preferredDistance;
+        
+        if (Math.abs(distance - targetDistance) > 20) {
+            if (distance < targetDistance) {
+                // Move away
+                this.ai.facing === 1 ? this.pressKey('arrowright') : this.pressKey('arrowleft');
+            } else {
+                // Move closer
+                this.ai.facing === 1 ? this.pressKey('arrowleft') : this.pressKey('arrowright');
+            }
         }
+    }
 
-        // Position management
-        this.managePosition(distance);
+    executeDefensiveStrategy(distance) {
+        // High chance to dodge if human is in attack range
+        if (distance <= this.human.originalAttackRange && Math.random() < 0.7) {
+            this.dodge();
+        }
+        
+        // Counter-attack if opportunity arises
+        if (this.human.isStunned || this.human.isDodging) {
+            if (distance <= this.stats.attackRange) {
+                this.attack(Math.random() < 0.3); // 30% chance for heavy attack
+            }
+        }
+        
+        // Occasional light attack to maintain pressure
+        if (Math.random() < 0.2 && distance <= this.stats.attackRange) {
+            this.attack(false);
+        }
+    }
 
-        // Attack if in range
+    executeAggressiveStrategy(distance) {
+        if (distance <= this.stats.attackRange) {
+            // In range - attack
+            if (!this.comboInProgress) {
+                this.startCombo();
+            }
+        } else if (distance <= this.maxRange) {
+            // Close to range - approach and prepare attack
+            this.approachAndAttack();
+        }
+        
+        // Dodge if in danger
+        if (distance <= this.dangerRange && Math.random() < 0.4) {
+            this.dodge();
+        }
+    }
+
+    executePunishStrategy(distance) {
+        if (distance <= this.stats.attackRange) {
+            // Prioritize heavy attacks during punish
+            this.attack(Math.random() < 0.7);
+        } else {
+            // Get in range quickly
+            this.approachAndAttack();
+        }
+    }
+
+    executeUltimateStrategy(distance) {
+        // Character-specific ultimate strategies
+        switch (this.stats.name.toLowerCase()) {
+            case 'warrior':
+                // Use ultimate when close and human is not invulnerable
+                if (distance <= this.stats.attackRange && !this.human.invincible) {
+                    this.useUltimate();
+                }
+                break;
+            case 'ninja':
+                // Use ultimate when at medium range
+                if (distance <= this.stats.ultimateDistance && distance >= this.stats.attackRange) {
+                    this.useUltimate();
+                }
+                break;
+            case 'mage':
+                // Use ultimate when human is in a predictable position
+                if (!this.human.isDodging && !this.human.isStunned) {
+                    this.useUltimate();
+                }
+                break;
+        }
+    }
+
+    executeNeutralStrategy(distance) {
+        // Mix of offensive and defensive actions
+        if (distance <= this.stats.attackRange) {
+            if (Math.random() < this.aggressiveness) {
+                this.attack(Math.random() < 0.3);
+            } else if (Math.random() < this.defensiveness) {
+                this.dodge();
+            }
+        }
+        
+        // Maintain ideal spacing
+        this.handleMovement(distance);
+    }
+
+    startCombo() {
+        this.comboInProgress = true;
+        
+        // Basic combo sequence
+        const executeCombo = async () => {
+            await this.attack(false); // Light attack
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await this.attack(false); // Light attack
+            await new Promise(resolve => setTimeout(resolve, 300));
+            await this.attack(true);  // Finish with heavy attack
+            this.comboInProgress = false;
+        };
+        
+        executeCombo();
+    }
+
+    approachAndAttack() {
+        const distance = this.getDistanceToHuman();
+        if (distance > this.stats.attackRange) {
+            // Move towards human
+            if (this.ai.x < this.human.x) {
+                this.pressKey('arrowright');
+            } else {
+                this.pressKey('arrowleft');
+            }
+        }
+        
+        // Attack when in range
         if (distance <= this.stats.attackRange * 1.1) {
-            this.decideAttack(distance, healthRatio);
+            this.attack(Math.random() < 0.3);
         }
     }
 
-    managePosition(distance) {
-        const playerCenter = this.player.x + 30;
-        const opponentCenter = this.opponent.x + 30;
-        let newKey = null;
-        
-        this.releaseAllKeys();
-        
-        // 更新面向 - 總是面向對手
-        this.player.facing = playerCenter < opponentCenter ? -1 : 1;
-        this.player.element.style.setProperty('--facing', this.player.facing);
-        
-        if (distance < this.preferredDistance * 0.7) {
-            // 太近，後退
-            newKey = playerCenter < opponentCenter ? 
-                (this.player === player1 ? 'a' : 'arrowleft') : 
-                (this.player === player1 ? 'd' : 'arrowright');
-        } else if (distance > this.preferredDistance * 1.3) {
-            // 太遠，前進
-            newKey = playerCenter < opponentCenter ? 
-                (this.player === player1 ? 'd' : 'arrowright') : 
-                (this.player === player1 ? 'a' : 'arrowleft');
-        }
-    
-        if (newKey && newKey !== this.currentKey) {
-            this.currentKey = newKey;
-            this.pressKey(this.currentKey);
+    // Utility methods
+    getDistanceToHuman() {
+        const aiCenter = this.ai.x + 30;
+        const humanCenter = this.human.x + 30;
+        return Math.abs(aiCenter - humanCenter);
+    }
+
+    attack(isHeavy) {
+        if (isHeavy) {
+            this.pressKey('p');
+            setTimeout(() => this.releaseKey('p'), 100);
+        } else {
+            this.pressKey('o');
+            setTimeout(() => this.releaseKey('o'), 100);
         }
     }
 
+    dodge() {
+        if (this.ai.dodgeCooldown <= 0) {
+            this.pressKey('u');
+            setTimeout(() => this.releaseKey('u'), 100);
+        }
+    }
+
+    useUltimate() {
+        this.pressKey('i');
+        setTimeout(() => this.releaseKey('i'), 100);
+    }
+
+    // Key management
     pressKey(key) {
-        const keyDownEvent = new KeyboardEvent('keydown', { 
-            key: key,
-            bubbles: true,
-            cancelable: true
-        });
-        document.dispatchEvent(keyDownEvent);
+        window.keys[key] = true;
     }
 
     releaseKey(key) {
-        const keyUpEvent = new KeyboardEvent('keyup', { 
-            key: key,
-            bubbles: true,
-            cancelable: true
-        });
-        document.dispatchEvent(keyUpEvent);
+        window.keys[key] = false;
     }
 
-    // [其餘方法保持不變]
-    calculatePreferredDistance() {
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior': return this.stats.attackRange * 0.8;
-            case 'ninja': return this.stats.attackRange * 1.2;
-            case 'mage': return this.stats.attackRange * 1.5;
-            default: return this.stats.attackRange;
-        }
-    }
-
-    calculateAggressionLevel() {
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior': return 0.8;
-            case 'ninja': return 0.6;
-            case 'mage': return 0.4;
-            default: return 0.5;
-        }
-    }
-
-    detectStuck() {
-        const currentPosition = this.player.x;
-        if (Math.abs(currentPosition - this.lastPosition) < 1) {
-            this.stuckCounter++;
-        } else {
-            this.stuckCounter = 0;
-        }
-        this.lastPosition = currentPosition;
-        return this.stuckCounter > 10;
-    }
-
-    performCombo() {
-        const now = Date.now();
-        
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior':
-                setTimeout(() => this.performHeavyAttack(), 0);
-                setTimeout(() => this.performLightAttack(), 300);
-                setTimeout(() => this.performHeavyAttack(), 600);
-                break;
-            case 'ninja':
-                setTimeout(() => this.performLightAttack(), 0);
-                setTimeout(() => this.performLightAttack(), 200);
-                setTimeout(() => this.performHeavyAttack(), 400);
-                break;
-            case 'mage':
-                setTimeout(() => this.performLightAttack(), 0);
-                setTimeout(() => this.performHeavyAttack(), 400);
-                break;
-        }
-        
-        this.comboCooldown = now + 1000;
-    }
-
-    shouldDodge(distance) {
-        const opponentIsAttacking = 
-            this.opponent.element.classList.contains('light-attack') ||
-            this.opponent.element.classList.contains('heavy-attack');
-        
-        return (
-            this.player.dodgeCooldown <= 0 && (
-                (opponentIsAttacking && distance < this.stats.attackRange * 1.2) ||
-                (this.player.health / this.stats.health < 0.3 && Math.random() > 0.7) ||
-                (Math.random() > 0.95)
-            )
-        );
-    }
-
-    shouldUseUltimate(healthRatio, opponentHealthRatio) {
-        if (this.player.ultimate < this.stats.ultimateRequired) return false;
-
-        const distance = this.calculateDistance();
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior':
-                return distance <= this.stats.attackRange * 1.5 && opponentHealthRatio > 0.3;
-            case 'ninja':
-                return healthRatio < 0.4 || opponentHealthRatio < 0.4;
-            case 'mage':
-                return this.opponent.isStunned || opponentHealthRatio < 0.5;
-            default:
-                return healthRatio < 0.5 || opponentHealthRatio < 0.3;
-        }
-    }
-
-    decideAttack(distance, healthRatio) {
-        const now = Date.now();
-        if (this.comboCooldown > now) return;
-
-        if (this.opponent.isStunned || this.opponent.isDodging) {
-            this.performHeavyAttack();
-            this.comboCooldown = now + 500;
-        } else if (distance <= this.stats.attackRange * 0.8) {
-            if (Math.random() < 0.7) {
-                this.performLightAttack();
-            } else {
-                this.performHeavyAttack();
-            }
-            this.comboCooldown = now + 300;
-        } else {
-            this.performLightAttack();
-            this.comboCooldown = now + 200;
-        }
-    }
-
-    performDodge() {
-        if (this.player.dodgeCooldown <= 0) {
-            this.releaseAllKeys(); // 確保在閃避前釋放所有移動鍵
-            
-            const dodgeEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'v' : 'u',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(dodgeEvent);
-        }
-    }
-
-    performLightAttack() {
-        if (this.player.lightCooldown <= 0) {
-            const attackEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'z' : 'o',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(attackEvent);
-        }
-    }
-
-    performHeavyAttack() {
-        if (this.player.heavyCooldown <= 0) {
-            const attackEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'x' : 'p',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(attackEvent);
-        }
-    }
-
-    performUltimate() {
-        if (this.player.ultimate >= this.stats.ultimateRequired) {
-            this.releaseAllKeys(); // 確保在釋放大招前釋放所有移動鍵
-            
-            const ultimateEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'c' : 'i',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(ultimateEvent);
-        }
+    releaseMovementKeys() {
+        this.releaseKey('arrowleft');
+        this.releaseKey('arrowright');
     }
 }
 
-function initComputerMode() {
-    const playerCharacter = localStorage.getItem('player1Character');
-    const getCounterCharacter = (playerChar) => {
-        switch(playerChar) {
-            case 'warrior': return 'mage';    // Mage counters Warrior
-            case 'mage': return 'ninja';   // Ninja counters Mage
-            case 'ninja': return 'warrior'; // Warrior counters Ninja
-            default: return ['warrior', 'ninja', 'mage'][Math.floor(Math.random() * 3)];
-        }
-    };
-    
-    const computerCharacter = getCounterCharacter(playerCharacter);
-    localStorage.setItem('player2Character', computerCharacter);
-    
-    return computerCharacter;
-}
+// Export the ComputerAI class
+window.ComputerAI = ComputerAI;

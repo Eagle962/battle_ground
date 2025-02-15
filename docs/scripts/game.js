@@ -10,7 +10,8 @@ const DODGE_COOLDOWN = 3000;
 const ULTIMATE_REQUIRED = 100;
 const ATTACK_RANGE = 80;
 const KNOCKBACK_FORCE = 8;
-
+const gameMode = localStorage.getItem('gameMode');
+let computerAI = null;
 // Player objects
 const player1 = {
     element: document.getElementById('player1'),
@@ -290,6 +291,12 @@ function checkGameEnd() {
     if (player1.health <= 0 || player2.health <= 0) {
         const winner = player1.health > 0 ? player1 : player2;
         const winnerCharacter = player1.health > 0 ? player1Character : player2Character;
+        
+        // Stop AI if it exists
+        if (window.computerAI) {
+            window.computerAI.stop();
+        }
+        
         showGameEndScreen(winner, winnerCharacter);
         return true;
     }
@@ -475,16 +482,15 @@ function distance(player1, player2) {
 function gameLoop() {
     // Check if game has ended before updating
     if (!checkGameEnd()) {
-        // Check if it's computer mode
-        const isComputerMode = localStorage.getItem('player2Character') !== null;
+        const gameMode = localStorage.getItem('gameMode');
 
-        // Update player 1 (WASD controls)
+        // Update player 1 (human player)
         updatePlayer(player1, player2, 
             { left: 'a', right: 'd' },
             { light: 'z', heavy: 'x' }
         );
 
-        // Update player 2 (Arrow keys or Computer AI)
+        // Update player 2 (human or AI)
         updatePlayer(player2, player1,
             { left: 'arrowleft', right: 'arrowright' },
             { light: 'o', heavy: 'p' }
@@ -507,25 +513,11 @@ function gameLoop() {
             performAttack(player1, player2, damage, true);
         }
 
-        // Attack checks for Player 2
-        const canAttack2 = !player2.isStunned && !player2.isDodging && 
-            (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
-        
-        // For computer mode, simulate attacks using predefined AI logic
-        if (isComputerMode) {
-            // Implement computer AI attack logic here
-            // This could be based on interval, random chance, or specific conditions
-            const randomAttackChance = Math.random();
-            if (randomAttackChance < 0.3 && canAttack2) {
-                const damage = characterStats[player2Character].lightDamage;
-                performAttack(player2, player1, damage, false);
-            }
-            if (randomAttackChance > 0.7 && canAttack2) {
-                const damage = characterStats[player2Character].heavyDamage;
-                performAttack(player2, player1, damage, true);
-            }
-        } else {
-            // Regular PvP attack checks
+        // Attack checks for Player 2 (only in PvP mode)
+        if (gameMode !== 'computer') {
+            const canAttack2 = !player2.isStunned && !player2.isDodging && 
+                (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
+            
             if (keys['o'] && canAttack2) {
                 const damage = player2.isInTimeStop ? 
                     characterStats[player2Character].lightDamage * 1.0 :
@@ -540,46 +532,26 @@ function gameLoop() {
             }
         }
 
-        // Ultimate controls
+        // Ultimate controls for Player 1
         if (keys['c'] && !player1.isStunned && !player1.isDodging && 
             (player1.ultimate >= characterStats[player1Character].ultimateRequired) && !player1.isUsingUltimate) {
             performUltimate(player1, player2);
         }
 
-        // For computer mode, add simple ultimate logic
-        if (isComputerMode) {
-            const ultimateChance = Math.random();
-            if (ultimateChance < 0.1 && // 10% chance 
-                !player2.isStunned && !player2.isDodging && 
-                (player2.ultimate >= characterStats[player2Character].ultimateRequired) && 
-                !player2.isUsingUltimate) {
-                performUltimate(player2, player1);
-            }
-        } else {
-            // Regular PvP ultimate control
-            if (keys['i'] && !player2.isStunned && !player2.isDodging && 
-                (player2.ultimate >= characterStats[player2Character].ultimateRequired) && !player2.isUsingUltimate) {
-                performUltimate(player2, player1);
-            }
+        // Ultimate controls for Player 2 (only in PvP mode)
+        if (gameMode !== 'computer' && keys['i'] && !player2.isStunned && !player2.isDodging && 
+            (player2.ultimate >= characterStats[player2Character].ultimateRequired) && !player2.isUsingUltimate) {
+            performUltimate(player2, player1);
         }
 
-        // Dodge controls
+        // Dodge controls for Player 1
         if (keys['v'] && !player1.isStunned && !player1.isUsingUltimate && !player1.isDodging) {
             performDodge(player1);
         }
 
-        // For computer mode, add dodge logic
-        if (isComputerMode) {
-            const dodgeChance = Math.random();
-            if (dodgeChance < 0.2 && // 20% chance
-                !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
-                performDodge(player2);
-            }
-        } else {
-            // Regular PvP dodge control
-            if (keys['u'] && !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
-                performDodge(player2);
-            }
+        // Dodge controls for Player 2 (only in PvP mode)
+        if (gameMode !== 'computer' && keys['u'] && !player2.isStunned && !player2.isUsingUltimate && !player2.isDodging) {
+            performDodge(player2);
         }
 
         // Update health bars
@@ -595,20 +567,15 @@ function gameLoop() {
             `${(player2.ultimate / characterStats[player2Character].ultimateRequired) * 100}%`;
 
         // Update cooldown displays
-        const p1LightCd = document.getElementById('p1-light-cd');
-        const p1HeavyCd = document.getElementById('p1-heavy-cd');
-        if (p1LightCd) p1LightCd.style.width = 
-            `${Math.max(0, (player1.lightCooldown / characterStats[player1Character].lightAttackCooldown) * 100)}%`;
-        if (p1HeavyCd) p1HeavyCd.style.width = 
-            `${Math.max(0, (player1.heavyCooldown / characterStats[player1Character].heavyAttackCooldown) * 100)}%`;
+        if (document.getElementById('cooldown1')) {
+            document.getElementById('cooldown1').textContent = 
+                `Light: ${Math.max(0, (player1.lightCooldown / 1000).toFixed(1))}s Heavy: ${Math.max(0, (player1.heavyCooldown / 1000).toFixed(1))}s`;
+        }
         
-        // Player 2 cooldown displays
-        const p2LightCd = document.getElementById('p2-light-cd');
-        const p2HeavyCd = document.getElementById('p2-heavy-cd');
-        if (p2LightCd) p2LightCd.style.width = 
-            `${Math.max(0, (player2.lightCooldown / characterStats[player2Character].lightAttackCooldown) * 100)}%`;
-        if (p2HeavyCd) p2HeavyCd.style.width = 
-            `${Math.max(0, (player2.heavyCooldown / characterStats[player2Character].heavyAttackCooldown) * 100)}%`;
+        if (document.getElementById('cooldown2') && gameMode !== 'computer') {
+            document.getElementById('cooldown2').textContent = 
+                `Light: ${Math.max(0, (player2.lightCooldown / 1000).toFixed(1))}s Heavy: ${Math.max(0, (player2.heavyCooldown / 1000).toFixed(1))}s`;
+        }
 
         // Continue the game loop
         requestAnimationFrame(gameLoop);
@@ -628,6 +595,20 @@ function initializePlayers() {
     // Add idle animation class
     player1.element.classList.add('idle-animation');
     player2.element.classList.add('idle-animation');
+
+    // Initialize AI if in computer mode
+    const gameMode = localStorage.getItem('gameMode');
+    if (gameMode === 'computer') {
+        // Create and start AI
+        window.computerAI = new ComputerAI(player2, player1, characterStats[player2Character]);
+        window.computerAI.start();
+
+        // Hide player 2 controls in computer mode
+        const player2Controls = document.querySelector('.player2-controls');
+        if (player2Controls) {
+            player2Controls.style.display = 'none';
+        }
+    }
 }
 
 // Initialize and start game
