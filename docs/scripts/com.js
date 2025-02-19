@@ -4,20 +4,20 @@ class ComputerAI {
         this.opponent = opponent;
         this.stats = stats;
         this.decisionInterval = null;
-        this.difficulty = 0.9;
+        this.difficulty = 2.0;
         this.lastDecisionTime = Date.now();
-        this.decisionDelay = 100;
+        this.decisionDelay = 5;
         this.comboCooldown = 0;
         this.lastPosition = this.player.x;
         this.stuckCounter = 0;
         this.preferredDistance = this.calculatePreferredDistance();
-        this.aggressionLevel = this.calculateAggressionLevel();
+        this.aggressionLevel = 2;
         this.currentKey = null;
         const playerCenter = this.player.x + 30;
         const opponentCenter = this.opponent.x + 30;
         this.player.facing = playerCenter < opponentCenter ? -1 : 1;
         this.player.element.style.setProperty('--facing', this.player.facing);
-}
+    }
 
     start() {
         this.decisionInterval = setInterval(() => {
@@ -42,69 +42,96 @@ class ComputerAI {
     }
 
     calculateDistance() {
-        const playerCenter = this.player.x + 30;
-        const opponentCenter = this.opponent.x + 30;
-        return Math.abs(playerCenter - opponentCenter);
+        // Get the actual DOM element positions
+        const playerRect = this.player.element.getBoundingClientRect();
+        const opponentRect = this.opponent.element.getBoundingClientRect();
+        
+        // Calculate centers using the actual screen positions
+        const playerCenter = playerRect.left + (playerRect.width / 2);
+        const opponentCenter = opponentRect.left + (opponentRect.width / 2);
+        const distance = Math.abs(playerCenter - opponentCenter);
+        
+        console.log('Distance calculation (DOM):', {
+            playerRect,
+            opponentRect,
+            playerCenter,
+            opponentCenter,
+            distance,
+            attackRange: this.stats.attackRange
+        });
+        
+        return distance;
+    }
+
+    isInAttackRange() {
+        // Use the new DOM-based distance calculation
+        const distance = this.calculateDistance();
+        const maxRange = this.stats.attackRange * 0.6;
+        
+        console.log('Range Check (DOM):', {
+            distance,
+            maxRange,
+            inRange: distance <= maxRange
+        });
+        
+        return distance <= maxRange;
     }
 
     makeDecision() {
-        const distance = this.calculateDistance();
+        if (!this.isInAttackRange()) {
+            // If not in range, only focus on movement
+            this.managePosition(this.calculateDistance());
+            return;
+        }
+
         const healthRatio = this.player.health / this.stats.health;
         const opponentHealthRatio = this.opponent.health / this.opponent.maxHealth;
-        
-        // Stuck detection
-        if (this.detectStuck()) {
-            this.performDodge();
-            this.stuckCounter = 0;
-            return;
-        }
 
-        // Emergency actions
-        if (healthRatio < 0.3 && this.shouldDodge(distance)) {
-            this.performDodge();
-            return;
-        }
+        // Only proceed with attacks if in range
+        if (this.isInAttackRange()) {
+            if (this.shouldDodge(this.calculateDistance())) {
+                this.performDodge();
+                return;
+            }
 
-        // Ultimate check
-        if (this.shouldUseUltimate(healthRatio, opponentHealthRatio)) {
-            this.performUltimate();
-            return;
-        }
+            if (this.player.ultimate >= this.stats.ultimateRequired && 
+                this.shouldUseUltimate(healthRatio, opponentHealthRatio)) {
+                this.performUltimate();
+                return;
+            }
 
-        // Position management
-        this.managePosition(distance);
-
-        // Attack if in range
-        if (distance <= this.stats.attackRange * 1.1) {
-            this.decideAttack(distance, healthRatio);
+            this.performOptimalCombo();
         }
     }
 
     managePosition(distance) {
-        const playerCenter = this.player.x + 30;
-        const opponentCenter = this.opponent.x + 30;
+        // Get actual screen positions
+        const playerRect = this.player.element.getBoundingClientRect();
+        const opponentRect = this.opponent.element.getBoundingClientRect();
+        
+        const playerCenter = playerRect.left + (playerRect.width / 2);
+        const opponentCenter = opponentRect.left + (opponentRect.width / 2);
         let newKey = null;
         
-        // 只釋放移動鍵，不釋放攻擊鍵
+        // Release current movement key
         if (this.currentKey) {
             this.releaseKey(this.currentKey);
             this.currentKey = null;
         }
         
-        // 更新面向
-        this.player.facing = playerCenter < opponentCenter ? -1 : 1;
+        // Update facing based on actual positions
+        this.player.facing = playerCenter < opponentCenter ? 1 : -1;
         this.player.element.style.setProperty('--facing', this.player.facing);
         
-        if (distance < this.preferredDistance * 0.7) {
-            newKey = playerCenter < opponentCenter ? 
-                (this.player === player1 ? 'a' : 'arrowleft') : 
-                (this.player === player1 ? 'd' : 'arrowright');
-        } else if (distance > this.preferredDistance * 1.3) {
+        // Get much closer before attacking
+        const optimalRange = this.stats.attackRange * 0.4;
+        
+        if (distance > optimalRange) {
             newKey = playerCenter < opponentCenter ? 
                 (this.player === player1 ? 'd' : 'arrowright') : 
                 (this.player === player1 ? 'a' : 'arrowleft');
         }
-    
+
         if (newKey && newKey !== this.currentKey) {
             this.currentKey = newKey;
             this.pressKey(this.currentKey);
@@ -112,40 +139,59 @@ class ComputerAI {
     }
 
     pressKey(key) {
-        const keyDownEvent = new KeyboardEvent('keydown', { 
-            key: key,
+        console.log('AI pressing key:', key);
+        
+        // Update the global keys object
+        keys[key.toLowerCase()] = true;
+        
+        // Create a more detailed keyboard event
+        const keyEvent = new KeyboardEvent('keydown', {
+            key: key.toLowerCase(),
+            code: key === 'o' ? 'KeyO' : key === 'p' ? 'KeyP' : `Key${key.toUpperCase()}`,
+            keyCode: key === 'o' ? 79 : key === 'p' ? 80 : key.toUpperCase().charCodeAt(0),
+            which: key === 'o' ? 79 : key === 'p' ? 80 : key.toUpperCase().charCodeAt(0),
             bubbles: true,
-            cancelable: true
+            cancelable: true,
+            composed: true,
+            repeat: false
         });
-        document.dispatchEvent(keyDownEvent);
+        
+        // Dispatch the event to both document and window
+        document.dispatchEvent(keyEvent);
+        window.dispatchEvent(keyEvent);
     }
 
     releaseKey(key) {
-        const keyUpEvent = new KeyboardEvent('keyup', { 
-            key: key,
+        console.log('AI releasing key:', key);
+        
+        // Update the global keys object
+        keys[key.toLowerCase()] = false;
+        
+        // Create a more detailed keyboard event
+        const keyEvent = new KeyboardEvent('keyup', {
+            key: key.toLowerCase(),
+            code: key === 'o' ? 'KeyO' : key === 'p' ? 'KeyP' : `Key${key.toUpperCase()}`,
+            keyCode: key === 'o' ? 79 : key === 'p' ? 80 : key.toUpperCase().charCodeAt(0),
+            which: key === 'o' ? 79 : key === 'p' ? 80 : key.toUpperCase().charCodeAt(0),
             bubbles: true,
-            cancelable: true
+            cancelable: true,
+            composed: true,
+            repeat: false
         });
-        document.dispatchEvent(keyUpEvent);
+        
+        // Dispatch the event to both document and window
+        document.dispatchEvent(keyEvent);
+        window.dispatchEvent(keyEvent);
     }
 
-    // [其餘方法保持不變]
     calculatePreferredDistance() {
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior': return this.stats.attackRange * 0.8;
-            case 'ninja': return this.stats.attackRange * 1.2;
-            case 'mage': return this.stats.attackRange * 1.5;
-            default: return this.stats.attackRange;
-        }
+        // Stay much closer for guaranteed hits
+        return this.stats.attackRange * 0.4;
     }
 
     calculateAggressionLevel() {
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior': return 0.8;
-            case 'ninja': return 0.6;
-            case 'mage': return 0.4;
-            default: return 0.5;
-        }
+        // Maximum aggression for all characters
+        return 0.95;
     }
 
     detectStuck() {
@@ -159,27 +205,54 @@ class ComputerAI {
         return this.stuckCounter > 10;
     }
 
-    performCombo() {
+    performOptimalCombo() {
         const now = Date.now();
+        if (this.comboCooldown > now) return;
+
+        // Only perform combo if in range
+        if (!this.isInAttackRange()) {
+            console.log('Combo cancelled - out of range');
+            return;
+        }
+
+        console.log('Performing combo - in range');
         
         switch(this.stats.name.toLowerCase()) {
             case 'warrior':
-                setTimeout(() => this.performHeavyAttack(), 0);
-                setTimeout(() => this.performLightAttack(), 300);
-                setTimeout(() => this.performHeavyAttack(), 600);
+                this.performHeavyAttack();
+                if (this.isInAttackRange()) {
+                    setTimeout(() => {
+                        if (this.isInAttackRange()) this.performLightAttack();
+                    }, 200);
+                    setTimeout(() => {
+                        if (this.isInAttackRange()) this.performHeavyAttack();
+                    }, 400);
+                }
                 break;
+                
             case 'ninja':
-                setTimeout(() => this.performLightAttack(), 0);
-                setTimeout(() => this.performLightAttack(), 200);
-                setTimeout(() => this.performHeavyAttack(), 400);
+                this.performLightAttack();
+                if (this.isInAttackRange()) {
+                    setTimeout(() => {
+                        if (this.isInAttackRange()) this.performLightAttack();
+                    }, 150);
+                    setTimeout(() => {
+                        if (this.isInAttackRange()) this.performHeavyAttack();
+                    }, 300);
+                }
                 break;
+                
             case 'mage':
-                setTimeout(() => this.performLightAttack(), 0);
-                setTimeout(() => this.performHeavyAttack(), 400);
+                this.performLightAttack();
+                if (this.isInAttackRange()) {
+                    setTimeout(() => {
+                        if (this.isInAttackRange()) this.performHeavyAttack();
+                    }, 250);
+                }
                 break;
         }
         
-        this.comboCooldown = now + 1000;
+        this.comboCooldown = now + 500;
     }
 
     shouldDodge(distance) {
@@ -187,49 +260,31 @@ class ComputerAI {
             this.opponent.element.classList.contains('light-attack') ||
             this.opponent.element.classList.contains('heavy-attack');
         
+        // Perfect dodge timing
         return (
             this.player.dodgeCooldown <= 0 && (
-                (opponentIsAttacking && distance < this.stats.attackRange * 1.2) ||
-                (this.player.health / this.stats.health < 0.3 && Math.random() > 0.7) ||
-                (Math.random() > 0.95)
+                (opponentIsAttacking && distance < this.stats.attackRange * 1.5) ||
+                (this.player.health / this.stats.health < 0.5) ||
+                (Math.random() > 0.8) // Random dodges to be unpredictable
             )
         );
     }
 
     shouldUseUltimate(healthRatio, opponentHealthRatio) {
-        if (this.player.ultimate < this.stats.ultimateRequired) return false;
+        if (this.player.ultimate < this.stats.ultimateRequired) {
+            return false;
+        }
 
         const distance = this.calculateDistance();
-        switch(this.stats.name.toLowerCase()) {
-            case 'warrior':
-                return distance <= this.stats.attackRange * 1.5 && opponentHealthRatio > 0.3;
-            case 'ninja':
-                return healthRatio < 0.4 || opponentHealthRatio < 0.4;
-            case 'mage':
-                return this.opponent.isStunned || opponentHealthRatio < 0.5;
-            default:
-                return healthRatio < 0.5 || opponentHealthRatio < 0.3;
-        }
-    }
-
-    decideAttack(distance, healthRatio) {
-        const now = Date.now();
-        if (this.comboCooldown > now) return;
-
-        if (this.opponent.isStunned || this.opponent.isDodging) {
-            this.performHeavyAttack();
-            this.comboCooldown = now + 500;
-        } else if (distance <= this.stats.attackRange * 0.8) {
-            if (Math.random() < 0.7) {
-                this.performLightAttack();
-            } else {
-                this.performHeavyAttack();
-            }
-            this.comboCooldown = now + 300;
-        } else {
-            this.performLightAttack();
-            this.comboCooldown = now + 200;
-        }
+        
+        // Use ultimate in these conditions:
+        return (
+            distance <= this.stats.attackRange * 1.2 || // When close enough
+            healthRatio < 0.5 || // When low health
+            opponentHealthRatio > 0.7 || // When opponent is healthy
+            this.opponent.isStunned || // When opponent is vulnerable
+            Math.random() < 0.3 // Random chance for unpredictability
+        );
     }
 
     performDodge() {
@@ -246,38 +301,51 @@ class ComputerAI {
     }
 
     performLightAttack() {
-        if (this.player.lightCooldown <= 0) {
-            const attackEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'z' : 'o',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(attackEvent);
-        }
+        if (!this.isInAttackRange() || this.player.lightCooldown > 0) return;
+        
+        console.log('Performing light attack - in range');
+        const key = this.player === player1 ? 'z' : 'o';
+        this.pressKey(key);
+        setTimeout(() => this.releaseKey(key), 100);
     }
 
     performHeavyAttack() {
-        if (this.player.heavyCooldown <= 0) {
-            const attackEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'x' : 'p',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(attackEvent);
-        }
+        if (!this.isInAttackRange() || this.player.heavyCooldown > 0) return;
+        
+        console.log('Performing heavy attack - in range');
+        const key = this.player === player1 ? 'x' : 'p';
+        this.pressKey(key);
+        setTimeout(() => this.releaseKey(key), 150);
     }
 
     performUltimate() {
         if (this.player.ultimate >= this.stats.ultimateRequired) {
-            this.releaseAllKeys(); // 確保在釋放大招前釋放所有移動鍵
+            console.log('AI performing ultimate attack!');
             
-            const ultimateEvent = new KeyboardEvent('keydown', {
-                key: this.player === player1 ? 'c' : 'i',
-                bubbles: true,
-                cancelable: true
-            });
-            document.dispatchEvent(ultimateEvent);
+            // Press the ultimate key
+            const ultimateKey = this.player === player1 ? 'c' : 'i';
+            console.log('Pressing ultimate key:', ultimateKey);
+            
+            // Quick press and release
+            this.pressKey(ultimateKey);
+            setTimeout(() => this.releaseKey(ultimateKey), 100); // Reduced to 100ms
+            
+            // Continue with movement after a short delay
+            setTimeout(() => {
+                if (this.currentKey) {
+                    this.pressKey(this.currentKey);
+                }
+            }, 150);
         }
+    }
+
+    checkUltimateStatus() {
+        console.log('Ultimate Status:', {
+            currentUltimate: this.player.ultimate,
+            requiredUltimate: this.stats.ultimateRequired,
+            characterName: this.stats.name,
+            canUseUltimate: this.player.ultimate >= this.stats.ultimateRequired
+        });
     }
 }
 

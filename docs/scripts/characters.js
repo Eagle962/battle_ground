@@ -16,7 +16,7 @@ const characterStats = {
         knockbackForce: 10,  
         ultimateDuration: 5000,  // Time stop duration in ms
         ultimateAttackRange: 150,  // Range during time stop
-        ultimateDamage: 0,  
+        ultimateDamage: 100,  
         style: 'linear-gradient(135deg, #e74c3c, #c0392b)',
         stats: {
             health: 3,

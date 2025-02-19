@@ -513,23 +513,21 @@ function gameLoop() {
             performAttack(player1, player2, damage, true);
         }
 
-        // Attack checks for Player 2 (only in PvP mode)
-        if (gameMode !== 'computer') {
-            const canAttack2 = !player2.isStunned && !player2.isDodging && 
-                (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
-            
-            if (keys['o'] && canAttack2) {
-                const damage = player2.isInTimeStop ? 
-                    characterStats[player2Character].lightDamage * 1.0 :
-                    characterStats[player2Character].lightDamage;
-                performAttack(player2, player1, damage, false);
-            }
-            if (keys['p'] && canAttack2) {
-                const damage = player2.isInTimeStop ? 
-                    characterStats[player2Character].heavyDamage * 1.0 :
-                    characterStats[player2Character].heavyDamage;
-                performAttack(player2, player1, damage, true);
-            }
+        // Attack checks for Player 2 (allow in both PvP and computer mode)
+        const canAttack2 = !player2.isStunned && !player2.isDodging && 
+            (!player2.isUsingUltimate || (player2Character === 'warrior' && player2.isInTimeStop));
+        
+        if ((keys['o'] || gameMode === 'computer') && canAttack2) {
+            const damage = player2.isInTimeStop ? 
+                characterStats[player2Character].lightDamage * 1.0 :
+                characterStats[player2Character].lightDamage;
+            performAttack(player2, player1, damage, false);
+        }
+        if ((keys['p'] || gameMode === 'computer') && canAttack2) {
+            const damage = player2.isInTimeStop ? 
+                characterStats[player2Character].heavyDamage * 1.0 :
+                characterStats[player2Character].heavyDamage;
+            performAttack(player2, player1, damage, true);
         }
 
         // Ultimate controls for Player 1
